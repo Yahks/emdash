@@ -7,23 +7,17 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "my-portfolio-site",
-		},
+			"database_name": "my-portfolio-site"
+		}
 	],
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
-			"bucket_name": "my-portfolio-media",
-		},
-	],
-	// Worker Loader for plugin sandboxing
-	"worker_loaders": [
-		{
-			"binding": "LOADER",
-		},
+			"bucket_name": "my-portfolio-media"
+		}
 	],
 	// General maintenance cron trigger
 	"triggers": {
-		"crons": ["* * * * *"],
-	},
+		"crons": ["* * * * *"]
+	}
 }
