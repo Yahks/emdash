@@ -49,16 +49,13 @@ const fullTitle = title.includes(siteTitle) ? title : `${title} — ${siteTitle}
 // Fetch primary menu defined in seed
 const menu = await getMenu("primary");
 
-// Optional "social" menu. If a site defines a `social` menu in its seed,
-// it'll render in the footer's "Connect" column. Otherwise that column
-// just shows RSS, avoiding duplication with the "Navigate" column above.
+// Optional "social" menu
 const socialMenu = await getMenu("social");
 
 // Fetch pages for footer
 const { entries: pages } = await getEmDashCollection("pages");
 
 // Build public page context for plugin contributions
-// SEO data is passed here and rendered securely by EmDashHead
 const pageCtx = createPublicPageContext({
 	Astro,
 	kind: content ? "content" : "custom",
@@ -74,7 +71,7 @@ const pageCtx = createPublicPageContext({
 	siteName: siteTitle,
 });
 
-// Check if user is logged in (for showing admin link)
+// Check if user is logged in
 const isLoggedIn = !!Astro.locals.user;
 ---
 
@@ -82,14 +79,13 @@ const isLoggedIn = !!Astro.locals.user;
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
 		<Font cssVariable="--font-body" preload />
 		<Font cssVariable="--font-mono" />
 		<title>{fullTitle}</title>
 		<EmDashHead page={pageCtx} />
 		<script is:inline>
 			// Apply an explicit theme choice immediately to prevent flash.
-			// With no cookie, color-scheme: light dark follows the OS.
 			(function () {
 				var c = document.cookie;
 				var i = c.indexOf("theme=");
@@ -101,7 +97,7 @@ const isLoggedIn = !!Astro.locals.user;
 		</script>
 		<!-- Google AdSense Global Library -->
 		<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
-        <!-- Mobile PWA & App Meta Tags -->
+		<!-- Mobile PWA & App Meta Tags -->
 		<link rel="manifest" href="/manifest.webmanifest" />
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
@@ -119,8 +115,7 @@ const isLoggedIn = !!Astro.locals.user;
 						: siteTitle
 					}
 				</a>
-				<!-- Layout-Safe Top Banner Ad -->
-				<AdSlot format="horizontal" />
+				
 				<div class="nav-right">
 					<LiveSearch
 						placeholder="Search..."
@@ -150,9 +145,19 @@ const isLoggedIn = !!Astro.locals.user;
 			</nav>
 		</header>
 
+		<!-- Layout-Safe Top Banner Ad (Placed outside header so it never squishes the navbar) -->
+		<div style="max-width: var(--wide-width); margin: 0.5rem auto; padding: 0 var(--spacing-6); overflow: hidden;">
+			<AdSlot format="horizontal" />
+		</div>
+
 		<main>
 			<slot />
 		</main>
+
+		<!-- Layout-Safe Bottom Article Ad -->
+		<div style="max-width: var(--wide-width); margin: 1rem auto; padding: 0 var(--spacing-6); overflow: hidden;">
+			<AdSlot format="auto" />
+		</div>
 
 		<footer class="site-footer">
 			<div class="footer-inner">
@@ -335,7 +340,6 @@ const isLoggedIn = !!Astro.locals.user;
 				return match ? match[1] : "system";
 			}
 
-			// Initialize
 			const storedTheme = getStoredTheme();
 			setTheme(storedTheme);
 
@@ -347,11 +351,6 @@ const isLoggedIn = !!Astro.locals.user;
 		</script>
 
 		<style is:global>
-			/*
-			 * Establish layer order: "base" has lower priority than unlayered
-			 * styles, so theme.css overrides always win regardless of source
-			 * order in the bundled CSS.
-			 */
 			@layer base;
 
 			@layer base {
@@ -359,6 +358,11 @@ const isLoggedIn = !!Astro.locals.user;
 				*:where(:not([class*="emdash"]):not([class*="ec-"]))::before,
 				*:where(:not([class*="emdash"]):not([class*="ec-"]))::after {
 					box-sizing: border-box;
+				}
+
+				html, body {
+					max-width: 100vw;
+					overflow-x: hidden;
 				}
 
 				body,
@@ -383,14 +387,6 @@ const isLoggedIn = !!Astro.locals.user;
 					padding: 0;
 				}
 
-				/*
-				 * Design tokens live in src/styles/tokens.css. Colors are
-				 * defined with light-dark(); these rules pin the scheme when
-				 * the footer switcher sets an explicit choice. With no class,
-				 * color-scheme: light dark follows the OS preference. The
-				 * @supports guard keeps the toggle from forcing dark UA form
-				 * controls on browsers stuck on the plain-light fallback.
-				 */
 				@supports (color: light-dark(#000, #fff)) {
 					:root.light {
 						color-scheme: light;
@@ -802,10 +798,11 @@ const isLoggedIn = !!Astro.locals.user;
 				}
 			}
 
+			/* 📱 MOBILE RESPONSIVE FIXES */
 			@media (max-width: 640px) {
 				.site-header {
-					position: relative;
-					border-bottom: none;
+					position: sticky;
+					top: 0;
 				}
 
 				.nav {
@@ -828,29 +825,48 @@ const isLoggedIn = !!Astro.locals.user;
 				.nav-right {
 					grid-column: 1 / -1;
 					grid-row: 2;
-					display: grid;
-					row-gap: var(--spacing-2);
+					display: flex;
+					flex-direction: column;
+					gap: var(--spacing-2);
+					width: 100%;
 				}
 
 				.site-search {
-					grid-column: 1;
 					width: 100%;
 					max-width: none;
 				}
 
 				:global(.site-search-input) {
 					width: 100% !important;
-					padding: var(--spacing-1) var(--spacing-2) !important;
+					padding: var(--spacing-2) var(--spacing-3) !important;
 					font-size: var(--font-size-sm) !important;
 				}
 
+				/* Swipeable horizontal pill menu on mobile (NO VERTICAL STACKING) */
 				.nav-links {
-					grid-column: 1;
-					display: flex;
-					column-gap: var(--spacing-3);
-					row-gap: var(--spacing-1);
-					flex-wrap: wrap;
-					justify-content: flex-start;
+					display: flex !important;
+					flex-direction: row !important;
+					flex-wrap: nowrap !important;
+					overflow-x: auto !important;
+					-webkit-overflow-scrolling: touch;
+					scrollbar-width: none;
+					gap: var(--spacing-2) !important;
+					padding: var(--spacing-1) 0;
+					width: 100%;
+				}
+
+				.nav-links::-webkit-scrollbar {
+					display: none;
+				}
+
+				.nav-links a {
+					white-space: nowrap !important;
+					padding: 0.35rem 0.75rem !important;
+					background: var(--color-surface, rgba(255,255,255,0.06));
+					border: 1px solid var(--color-border-subtle);
+					border-radius: 9999px;
+					font-size: var(--font-size-xs) !important;
+					flex-shrink: 0;
 				}
 
 				.nav-admin {
@@ -898,7 +914,5 @@ const isLoggedIn = !!Astro.locals.user;
 			});
 		</script>
 		<EmDashBodyEnd page={pageCtx} />
-		<!-- Layout-Safe Bottom Article Ad -->
-		<AdSlot format="auto" />
 	</body>
 </html>
