@@ -107,6 +107,32 @@ const isLoggedIn = !!Astro.locals.user;
 	</head>
 	<body>
 		<EmDashBodyStart page={pageCtx} />
+     <!-- ========================================================= -->
+		<!-- 📈 LIVE FINANCIAL MARKET TICKER TAPE (TRADINGVIEW)         -->
+		<!-- ========================================================= -->
+		<div class="market-ticker-wrapper">
+			<div class="tradingview-widget-container">
+				<div class="tradingview-widget-container__widget"></div>
+				<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+				{
+					"symbols": [
+						{ "proName": "FOREXCOM:SPXUSD", "title": "S&P 500" },
+						{ "proName": "FOREXCOM:NSXUSD", "title": "Nasdaq 100" },
+						{ "proName": "FOREXCOM:DJI", "title": "Dow Jones" },
+						{ "proName": "TVC:US10Y", "title": "US 10Y Yield" },
+						{ "proName": "TVC:GOLD", "title": "Gold" },
+						{ "proName": "TVC:USOIL", "title": "Crude Oil" },
+						{ "proName": "BINANCE:BTCUSDT", "title": "Bitcoin" }
+					],
+					"showSymbolLogo": true,
+					"isTransparent": false,
+					"displayMode": "adaptive",
+					"colorTheme": "dark",
+					"locale": "en"
+				}
+				</script>
+			</div>
+		</div>
 		<header class="site-header">
 			<nav class="nav">
 				<a href="/" class="site-title">
@@ -462,6 +488,13 @@ const isLoggedIn = !!Astro.locals.user;
 				-webkit-backdrop-filter: blur(12px);
 				border-bottom: 1px solid var(--color-border-subtle);
 			}
+         .market-ticker-wrapper {
+			width: 100%;
+			overflow: hidden;
+			background: #0f172a;
+			border-bottom: 1px solid var(--color-border-subtle);
+			min-height: 46px;
+		}
 
 			.nav {
 				display: flex;
