@@ -1,29 +1,23 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "my-emdash-site",
+	"name": "usstocks-admin",
 	"main": "./src/worker.ts",
 	"compatibility_date": "2026-02-24",
 	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "my-emdash-site",
-		},
+			"database_name": "usstocks-db",
+			"database_id": "180dde1d-e340-46e2-851e-9606f23352f9"
+		}
 	],
 	"r2_buckets": [
 		{
 			"binding": "MEDIA",
-			"bucket_name": "my-emdash-media",
-		},
+			"bucket_name": "usstocks-media"
+		}
 	],
-	// Worker Loader for plugin sandboxing
-	"worker_loaders": [
-		{
-			"binding": "LOADER",
-		},
-	],
-	// General maintenance cron trigger
 	"triggers": {
-		"crons": ["* * * * *"],
-	},
+		"crons": ["* * * * *"]
+	}
 }
