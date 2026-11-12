@@ -205,6 +205,31 @@ const isLoggedIn = !!Astro.locals.user;
 						<line x1="12" y1="9" x2="12" y2="13"></line>
 						<line x1="12" y1="17" x2="12.01" y2="17"></line>
 					</svg>
+<!-- ========================================================= -->
+		<!-- 📬 DAILY PRE-MARKET BRIEFING NEWSLETTER BOX               -->
+		<!-- ========================================================= -->
+		<section class="newsletter-section">
+			<div class="newsletter-card">
+				<div class="newsletter-content">
+					<div class="newsletter-pill">PRE-MARKET BRIEFING</div>
+					<h3 class="newsletter-title">Get Institutional Market Signals Before the Opening Bell</h3>
+					<p class="newsletter-desc">
+						Join 15,000+ traders receiving our daily macro thesis, key S&P 500 support/resistance levels, and sector rotation analysis every morning at 8:00 AM EST.
+					</p>
+				</div>
+				<form class="newsletter-form" onsubmit="event.preventDefault(); alert('Subscribed to Daily Pre-Market Briefing!');">
+					<input 
+						type="email" 
+						placeholder="Enter your institutional or work email..." 
+						required 
+						class="newsletter-input" 
+					/>
+					<button type="submit" class="newsletter-btn">
+						Subscribe Free
+					</button>
+				</form>
+			</div>
+		</section>
 					<span>IMPORTANT FINANCIAL & INVESTMENT DISCLAIMER</span>
 				</div>
 				<p class="disclaimer-text">
@@ -545,6 +570,97 @@ const isLoggedIn = !!Astro.locals.user;
 				color: var(--color-text);
 				text-decoration: none;
 				letter-spacing: var(--tracking-snug);
+			}
+/* 📬 Market Briefing Newsletter Card Styling */
+			.newsletter-section {
+				max-width: var(--wide-width);
+				margin: 3rem auto;
+				padding: 0 var(--spacing-6);
+			}
+
+			.newsletter-card {
+				background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				border-radius: var(--radius-lg);
+				padding: var(--spacing-8);
+				display: grid;
+				grid-template-columns: 1.5fr 1fr;
+				gap: var(--spacing-8);
+				align-items: center;
+				box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+			}
+
+			.newsletter-pill {
+				display: inline-block;
+				background: rgba(2, 132, 199, 0.2);
+				color: #38bdf8;
+				border: 1px solid rgba(56, 189, 248, 0.3);
+				border-radius: 9999px;
+				padding: 0.25rem 0.75rem;
+				font-size: 0.75rem;
+				font-weight: 700;
+				letter-spacing: 0.05em;
+				margin-bottom: 0.75rem;
+			}
+
+			.newsletter-title {
+				font-size: var(--font-size-xl);
+				font-weight: 700;
+				color: #f8fafc;
+				line-height: 1.25;
+				margin-bottom: 0.5rem;
+			}
+
+			.newsletter-desc {
+				font-size: var(--font-size-sm);
+				color: #94a3b8;
+				line-height: 1.5;
+			}
+
+			.newsletter-form {
+				display: flex;
+				flex-direction: column;
+				gap: 0.75rem;
+			}
+
+			.newsletter-input {
+				width: 100%;
+				padding: 0.75rem 1rem;
+				border-radius: var(--radius);
+				border: 1px solid rgba(255, 255, 255, 0.15);
+				background: rgba(15, 23, 42, 0.6);
+				color: #fff;
+				font-size: var(--font-size-sm);
+				outline: none;
+			}
+
+			.newsletter-input:focus {
+				border-color: #38bdf8;
+			}
+
+			.newsletter-btn {
+				width: 100%;
+				padding: 0.75rem;
+				background: #0284c7;
+				color: #fff;
+				font-weight: 700;
+				font-size: var(--font-size-sm);
+				border: none;
+				border-radius: var(--radius);
+				cursor: pointer;
+				transition: background 0.2s;
+			}
+
+			.newsletter-btn:hover {
+				background: #0369a1;
+			}
+
+			@media (max-width: 768px) {
+				.newsletter-card {
+					grid-template-columns: 1fr;
+					padding: var(--spacing-6);
+					gap: var(--spacing-6);
+				}
 			}
 /* ⚖️ Financial Disclaimer Box Styling */
 			.financial-disclaimer-section {
