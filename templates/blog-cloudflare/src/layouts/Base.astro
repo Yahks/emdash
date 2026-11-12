@@ -546,6 +546,45 @@ const isLoggedIn = !!Astro.locals.user;
 				text-decoration: none;
 				letter-spacing: var(--tracking-snug);
 			}
+/* ⚖️ Financial Disclaimer Box Styling */
+			.financial-disclaimer-section {
+				background: color-mix(in srgb, var(--color-bg-subtle) 50%, var(--color-bg));
+				border-top: 1px solid var(--color-border-subtle);
+				border-bottom: 1px solid var(--color-border-subtle);
+				padding: var(--spacing-8) var(--spacing-6);
+			}
+
+			.disclaimer-inner {
+				max-width: var(--wide-width);
+				margin: 0 auto;
+			}
+
+			.disclaimer-badge {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-size: var(--font-size-xs);
+				font-weight: 700;
+				letter-spacing: var(--tracking-wider);
+				color: #eab308; /* Financial Amber warning color */
+				margin-bottom: var(--spacing-3);
+				text-transform: uppercase;
+			}
+
+			.disclaimer-text {
+				font-size: 0.75rem;
+				line-height: 1.6;
+				color: var(--color-muted);
+				margin-bottom: 0.5rem;
+			}
+
+			.disclaimer-text:last-child {
+				margin-bottom: 0;
+			}
+
+			.disclaimer-text strong {
+				color: var(--color-text-secondary);
+			}
 
 			.site-title:hover {
 				color: var(--color-brand);
