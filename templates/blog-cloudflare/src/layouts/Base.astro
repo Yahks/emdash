@@ -107,14 +107,24 @@ const isLoggedIn = !!Astro.locals.user;
 	</head>
 	<body>
 		<EmDashBodyStart page={pageCtx} />
-     <!-- ========================================================= -->
+<!-- ========================================================= -->
 		<!-- 📈 LIVE FINANCIAL MARKET TICKER TAPE (TRADINGVIEW)         -->
 		<!-- ========================================================= -->
 		<div class="market-ticker-wrapper">
-			<div class="tradingview-widget-container">
+			<div class="tradingview-widget-container" id="tradingview-ticker-container">
 				<div class="tradingview-widget-container__widget"></div>
-			<!-- ✅ After (with is:inline): -->
-			<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async is:inline>				{
+			</div>
+		</div>
+
+		<script is:inline>
+			(function() {
+				const container = document.getElementById('tradingview-ticker-container');
+				if (!container) return;
+				const tvScript = document.createElement('script');
+				tvScript.type = 'text/javascript';
+				tvScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+				tvScript.async = true;
+				tvScript.innerHTML = JSON.stringify({
 					"symbols": [
 						{ "proName": "FOREXCOM:SPXUSD", "title": "S&P 500" },
 						{ "proName": "FOREXCOM:NSXUSD", "title": "Nasdaq 100" },
@@ -129,9 +139,11 @@ const isLoggedIn = !!Astro.locals.user;
 					"displayMode": "adaptive",
 					"colorTheme": "dark",
 					"locale": "en"
-				}
-				</script>
-			</div>
+				});
+				container.appendChild(tvScript);
+			})();
+		</script>
+	 </div>
 		</div>
 		<header class="site-header">
 			<nav class="nav">
