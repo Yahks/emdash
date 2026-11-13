@@ -196,17 +196,25 @@ const isLoggedIn = !!Astro.locals.user;
 						Join 15,000+ traders receiving our daily macro thesis, key S&P 500 support/resistance levels, and sector rotation analysis every morning at 8:00 AM EST.
 					</p>
 				</div>
-				<form class="newsletter-form" onsubmit="event.preventDefault(); alert('Subscribed to Daily Pre-Market Briefing!');">
-					<input 
-						type="email" 
-						placeholder="Enter your institutional or work email..." 
-						required 
-						class="newsletter-input" 
-					/>
-					<button type="submit" class="newsletter-btn">
-						Subscribe Free
-					</button>
-				</form>
+					<form 
+					    class="newsletter-form" 
+					    action="https://buttondown.com/api/emails/embed-subscribe/aardess" 
+					    method="post"
+					    target="popupwindow"
+					>
+					    <input 
+					        type="email" 
+					        name="email"
+					        placeholder="Enter your institutional or work email..." 
+					        required 
+					        class="newsletter-input" 
+					        autocomplete="email"
+					    />
+					    <input type="hidden" name="embed" value="1" />
+					    <button type="submit" class="newsletter-btn">
+					        Subscribe Free
+					    </button>
+					</form>
 			</div>
 		</section>
 
