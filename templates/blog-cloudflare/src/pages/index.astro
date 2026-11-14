@@ -10,8 +10,8 @@ import PostCard from "../components/PostCard.astro";
 import { getReadingTime } from "../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 
-// Limit to what we render (1 featured + 6 grid).
-const POSTS_PER_PAGE = 7;
+// Increased limit so editorial desks display ample market research
+const POSTS_PER_PAGE = 12;
 
 const [{ entries: posts, cacheHint }, settings] = await Promise.all([
 	getEmDashCollection("posts", {
@@ -31,14 +31,19 @@ const hasMorePosts = posts.length > POSTS_PER_PAGE;
 const featuredPost = visiblePosts.find((p) => p.data.featured_image);
 const featuredIndex = featuredPost ? visiblePosts.indexOf(featuredPost) : -1;
 
-// Get remaining posts (exclude featured if found, limit to 6 for grid)
-const gridPosts = visiblePosts.filter((_, i) => i !== featuredIndex).slice(0, 6);
+// Remaining posts for the sector desks
+const gridPosts = visiblePosts.filter((_, i) => i !== featuredIndex);
 
-const tagEntryIds = [
+const entryIds = [
 	...(featuredPost ? [featuredPost.data.id] : []),
 	...gridPosts.map((p) => p.data.id),
 ];
-const tagsByEntry = await getTermsForEntries("posts", tagEntryIds, "tag");
+
+// Single batched query for both tags AND categories
+const [tagsByEntry, categoriesByEntry] = await Promise.all([
+	getTermsForEntries("posts", entryIds, "tag"),
+	getTermsForEntries("posts", entryIds, "category"),
+]);
 
 const featuredTags = featuredPost
 	? (tagsByEntry.get(featuredPost.data.id) ?? []).map((t) => ({
@@ -46,22 +51,41 @@ const featuredTags = featuredPost
 			label: t.label,
 		}))
 	: [];
+const featuredCategories = featuredPost
+	? (categoriesByEntry.get(featuredPost.data.id) ?? []).map((c) => ({
+			slug: c.slug,
+			label: c.label,
+		}))
+	: [];
 const featuredBylines = featuredPost?.data.bylines ?? [];
 
-const gridPostsWithTags = gridPosts.map((post) => ({
+const gridPostsWithMeta = gridPosts.map((post) => ({
 	post,
 	tags: (tagsByEntry.get(post.data.id) ?? []).map((t) => ({
 		slug: t.slug,
 		label: t.label,
 	})),
+	categories: (categoriesByEntry.get(post.data.id) ?? []).map((c) => ({
+		slug: c.slug,
+		label: c.label,
+	})),
 	bylines: post.data.bylines ?? [],
 }));
+
+// Collect unique categories present on posts for dynamic filter pills
+const availableCategories = Array.from(
+	new Map(
+		gridPostsWithMeta
+			.flatMap((p) => p.categories)
+			.map((c) => [c.slug, c])
+	).values()
+);
 
 function formatDate(date: Date | null | undefined) {
 	if (!date) return null;
 	return date.toLocaleDateString("en-US", {
 		year: "numeric",
-		month: "long",
+		month: "short",
 		day: "numeric",
 	});
 }
@@ -71,47 +95,28 @@ function formatDate(date: Date | null | undefined) {
 	{
 		posts.length === 0 ? (
 			<section class="empty-state">
-				<h2>No posts yet</h2>
-				<p>Create your first post in the admin panel.</p>
+				<h2>No market analysis published yet</h2>
+				<p>Create your first equity research breakdown in the admin panel.</p>
 				<a href="/_emdash/admin/content/posts/new" class="btn">
-					Create a post
+					Write Market Report
 				</a>
 			</section>
 		) : (
 			<div class="home-content">
-				{/* Featured Hero Post - Title at TOP, Image BELOW */}
+				{/* 1. FEATURED HERO POST - Title on TOP, Full-width Chart BELOW */}
 				{featuredPost && (
 					<section class="featured-section">
 						<div class="featured-hero-container">
-							{/* 1. Title & Meta Section at the TOP */}
 							<div class="featured-content">
 								<div class="featured-meta">
+									{featuredCategories.length > 0 && (
+										<span class="sector-badge">{featuredCategories[0].label}</span>
+									)}
 									{featuredBylines.length > 0 && (
 										<>
-											<div class="featured-bylines">
-												{featuredBylines.slice(0, 2).map((credit, index) => (
-													<>
-														{index > 0 && <span class="byline-sep">,</span>}
-														<span class="featured-byline">
-															{credit.byline.avatarMediaId && (
-																<img
-																	src={`/_emdash/api/media/file/${credit.byline.avatarMediaId}`}
-																	alt={credit.byline.displayName}
-																	class="featured-byline-avatar"
-																/>
-															)}
-															<span class="featured-byline-name">
-																{credit.byline.displayName}
-															</span>
-														</span>
-													</>
-												))}
-												{featuredBylines.length > 2 && (
-													<span class="byline-more">
-														+{featuredBylines.length - 2}
-													</span>
-												)}
-											</div>
+											<span class="featured-byline-name">
+												{featuredBylines[0].byline.displayName}
+											</span>
 											<span class="meta-dot" />
 										</>
 									)}
@@ -119,15 +124,10 @@ function formatDate(date: Date | null | undefined) {
 										<time>{formatDate(featuredPost.data.publishedAt)}</time>
 									)}
 									<span class="meta-dot" />
-									<span>
-										{getReadingTime(featuredPost.data.content)} min read
-									</span>
+									<span>{getReadingTime(featuredPost.data.content)} min read</span>
 								</div>
 
-								<a
-									href={`/posts/${featuredPost.id}`}
-									class="featured-title-link"
-								>
+								<a href={`/posts/${featuredPost.id}`} class="featured-title-link">
 									<h1 class="featured-title">{featuredPost.data.title}</h1>
 								</a>
 
@@ -139,14 +139,13 @@ function formatDate(date: Date | null | undefined) {
 									<div class="featured-tags">
 										{featuredTags.map((tag) => (
 											<a href={`/tag/${tag.slug}`} class="featured-tag">
-												{tag.label}
+												#{tag.label}
 											</a>
 										))}
 									</div>
 								)}
 							</div>
 
-							{/* 2. Full-Width Featured Image Below the Title */}
 							<a href={`/posts/${featuredPost.id}`} class="featured-image-link">
 								<div class="featured-image">
 									<Image image={featuredPost.data.featured_image} />
@@ -155,9 +154,8 @@ function formatDate(date: Date | null | undefined) {
 						</div>
 					</section>
 				)}
-<!-- ========================================================= -->
-				<!-- 📊 S&P 500 SECTOR HEATMAP (FINANCIAL TERMINAL WIDGET)       -->
-				<!-- ========================================================= -->
+
+				{/* 2. S&P 500 SECTOR PERFORMANCE HEATMAP */}
 				<section class="heatmap-section">
 					<header class="section-header">
 						<div>
@@ -191,9 +189,8 @@ function formatDate(date: Date | null | undefined) {
 						</div>
 					</div>
 				</section>
-<!-- ========================================================= -->
-				<!-- 📅 LIVE ECONOMIC & MACRO CATALYST CALENDAR                -->
-				<!-- ========================================================= -->
+
+				{/* 3. LIVE MACRO & ECONOMIC CALENDAR */}
 				<section class="calendar-section">
 					<header class="section-header">
 						<div>
@@ -219,29 +216,44 @@ function formatDate(date: Date | null | undefined) {
 						</div>
 					</div>
 				</section>
-				{/* Latest Posts Grid */}
-				{gridPostsWithTags.length > 0 && (
-					<section class="posts-section">
-						<header class="section-header">
-							<h2 class="section-title">Latest</h2>
-							{hasMorePosts && (
-								<a href="/posts" class="section-link">
-									View all
-								</a>
-							)}
+
+				{/* 4. SECTOR EDITORIAL DESKS WITH INTERACTIVE FILTERING */}
+				{gridPostsWithMeta.length > 0 && (
+					<section class="editorial-desks-section">
+						<header class="desks-header">
+							<div>
+								<h2 class="section-title">Market Coverage & Research Desks</h2>
+								<p class="section-subtitle">In-depth technical analysis, macro policy, and trade execution</p>
+							</div>
+
+							<!-- Interactive Filter Bar -->
+							<div class="sector-filter-bar">
+								<button class="filter-btn active" data-filter="all">All Coverage</button>
+								{availableCategories.map((cat) => (
+									<button class="filter-btn" data-filter={cat.slug}>
+										{cat.label}
+									</button>
+								))}
+							</div>
 						</header>
-						<div class="posts-grid">
-							{gridPostsWithTags.map(({ post, tags, bylines }) => (
-								<PostCard
-									title={post.data.title ?? "Untitled"}
-									excerpt={post.data.excerpt}
-									featuredImage={post.data.featured_image}
-									href={`/posts/${post.id}`}
-									date={post.data.publishedAt ?? undefined}
-									readingTime={getReadingTime(post.data.content)}
-									tags={tags}
-									bylines={bylines}
-								/>
+
+						<div class="posts-grid" id="postsGrid">
+							{gridPostsWithMeta.map(({ post, tags, categories, bylines }) => (
+								<div 
+									class="post-card-container" 
+									data-categories={categories.map((c) => c.slug).join(",")}
+								>
+									<PostCard
+										title={post.data.title ?? "Untitled"}
+										excerpt={post.data.excerpt}
+										featuredImage={post.data.featured_image}
+										href={`/posts/${post.id}`}
+										date={post.data.publishedAt ?? undefined}
+										readingTime={getReadingTime(post.data.content)}
+										tags={tags}
+										bylines={bylines}
+									/>
+								</div>
 							))}
 						</div>
 					</section>
@@ -249,16 +261,48 @@ function formatDate(date: Date | null | undefined) {
 			</div>
 		)
 	}
+
+	<!-- ⚡ CLIENT-SIDE INSTANT SECTOR FILTER SCRIPT -->
+	<script is:inline>
+		function initSectorFilters() {
+			const buttons = document.querySelectorAll(".filter-btn");
+			const cards = document.querySelectorAll(".post-card-container");
+
+			buttons.forEach((btn) => {
+				btn.addEventListener("click", () => {
+					buttons.forEach((b) => b.classList.remove("active"));
+					btn.classList.add("active");
+
+					const filter = btn.getAttribute("data-filter");
+
+					cards.forEach((card) => {
+						const cardCategories = card.getAttribute("data-categories") || "";
+						if (filter === "all" || cardCategories.split(",").includes(filter)) {
+							card.style.display = "block";
+						} else {
+							card.style.display = "none";
+						}
+					});
+				});
+			});
+		}
+
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", initSectorFilters);
+		} else {
+			initSectorFilters();
+		}
+	</script>
 </Base>
 
 <style>
 	.home-content {
 		max-width: var(--wide-width);
 		margin: 0 auto;
-		padding: var(--spacing-10) var(--spacing-6) var(--spacing-16);
+		padding: var(--spacing-8) var(--spacing-6) var(--spacing-16);
 	}
 
-	/* Featured Section: Vertical Top-to-Bottom Layout */
+	/* Hero Section */
 	.featured-section {
 		margin-bottom: var(--spacing-16);
 		padding-bottom: var(--spacing-12);
@@ -280,6 +324,18 @@ function formatDate(date: Date | null | undefined) {
 		text-align: left;
 	}
 
+	.sector-badge {
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		padding: 0.2rem 0.6rem;
+		border-radius: 4px;
+		background: rgba(2, 132, 199, 0.15);
+		color: #38bdf8;
+		border: 1px solid rgba(56, 189, 248, 0.3);
+	}
+
 	.featured-meta {
 		display: flex;
 		align-items: center;
@@ -297,40 +353,9 @@ function formatDate(date: Date | null | undefined) {
 		background: var(--color-muted);
 	}
 
-	/* Featured bylines */
-	.featured-bylines {
-		display: flex;
-		align-items: center;
-		gap: 2px;
-	}
-
-	.featured-byline {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--spacing-2);
-	}
-
-	.featured-byline-avatar {
-		width: var(--avatar-size-md);
-		height: var(--avatar-size-md);
-		border-radius: 50%;
-		object-fit: cover;
-	}
-
 	.featured-byline-name {
-		font-weight: 500;
-		color: var(--color-text-secondary);
-	}
-
-	.byline-sep {
-		color: var(--color-muted);
-		margin-right: 2px;
-	}
-
-	.byline-more {
-		font-size: var(--font-size-xs);
-		color: var(--color-muted);
-		margin-left: 2px;
+		font-weight: 600;
+		color: var(--color-text);
 	}
 
 	.featured-title-link {
@@ -339,10 +364,10 @@ function formatDate(date: Date | null | undefined) {
 	}
 
 	.featured-title {
-		font-size: clamp(var(--font-size-2xl), 5vw, var(--font-size-4xl));
-		font-weight: var(--font-weight-display);
-		line-height: var(--leading-tight);
-		letter-spacing: var(--tracking-tight);
+		font-size: clamp(2rem, 5vw, 3.25rem);
+		font-weight: 800;
+		line-height: 1.15;
+		letter-spacing: -0.02em;
 		transition: color var(--transition-fast);
 		margin: var(--spacing-1) 0;
 	}
@@ -355,53 +380,44 @@ function formatDate(date: Date | null | undefined) {
 		font-size: var(--font-size-lg);
 		line-height: var(--leading-relaxed);
 		color: var(--color-text-secondary);
-		max-width: 800px;
+		max-width: 850px;
 	}
 
 	.featured-tags {
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--spacing-2);
-		margin-top: var(--spacing-2);
+		margin-top: var(--spacing-1);
 	}
 
 	.featured-tag {
-		display: inline-block;
-		padding: var(--tag-padding-y) var(--spacing-2);
 		font-size: var(--font-size-xs);
-		color: var(--color-text-secondary);
-		background: var(--color-surface);
-		border-radius: var(--radius);
+		color: var(--color-muted);
 		text-decoration: none;
-		transition:
-			color var(--transition-fast),
-			background var(--transition-fast);
+		transition: color 0.2s;
 	}
 
 	.featured-tag:hover {
-		color: var(--color-text);
-		background: var(--color-border);
+		color: var(--color-brand);
 	}
 
-	/* Featured Image styling */
 	.featured-image-link {
 		display: block;
 		width: 100%;
 		border-radius: var(--radius-lg);
 		overflow: hidden;
-		box-shadow: var(--shadow-md);
+		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
 	}
 
 	.featured-image {
 		width: 100%;
 		background: var(--color-surface);
-		overflow: hidden;
 	}
 
 	.featured-image img {
 		width: 100%;
 		height: auto;
-		max-height: 550px;
+		max-height: 540px;
 		aspect-ratio: 16 / 9;
 		object-fit: cover;
 		transition: transform 0.4s ease;
@@ -409,43 +425,108 @@ function formatDate(date: Date | null | undefined) {
 	}
 
 	.featured-image-link:hover .featured-image img {
-		transform: scale(1.02);
+		transform: scale(1.015);
 	}
 
-	/* Section header */
+	/* Section Headers */
 	.section-header {
+		margin-bottom: var(--spacing-6);
+	}
+
+	.section-title {
+		font-size: var(--font-size-base);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-brand);
+	}
+
+	.section-subtitle {
+		font-size: var(--font-size-sm);
+		color: var(--color-muted);
+		margin-top: 3px;
+	}
+
+	/* Heatmap & Calendar Cards */
+	.heatmap-section,
+	.calendar-section {
+		margin-bottom: var(--spacing-16);
+		padding-bottom: var(--spacing-12);
+		border-bottom: 1px solid var(--color-border-subtle);
+		width: 100%;
+	}
+
+	.heatmap-card,
+	.calendar-card {
+		width: 100%;
+		height: 520px;
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		border: 1px solid var(--color-border-subtle);
+		background: #0f172a;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+	}
+
+	/* Editorial Desks Layout */
+	.editorial-desks-section {
+		margin-top: var(--spacing-10);
+	}
+
+	.desks-header {
 		display: flex;
 		justify-content: space-between;
-		align-items: baseline;
+		align-items: flex-end;
+		flex-wrap: wrap;
+		gap: 1.25rem;
 		margin-bottom: var(--spacing-8);
 		padding-bottom: var(--spacing-4);
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 
-	.section-title {
-		font-size: var(--font-size-sm);
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-wider);
-		color: var(--color-muted);
+	/* Sector Filter Pills */
+	.sector-filter-bar {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
 	}
 
-	.section-link {
-		font-size: var(--font-size-sm);
-		color: var(--color-brand);
-		text-decoration: none;
-		transition: color var(--transition-fast);
+	.filter-btn {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border-subtle);
+		color: var(--color-text-secondary);
+		padding: 0.4rem 0.9rem;
+		border-radius: 9999px;
+		font-size: var(--font-size-xs);
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		white-space: nowrap;
 	}
 
-	.section-link:hover {
-		color: var(--color-brand-hover);
+	.filter-btn:hover {
+		color: var(--color-text);
+		border-color: var(--color-border);
+	}
+
+	.filter-btn.active {
+		background: var(--color-brand);
+		color: var(--color-on-brand);
+		border-color: var(--color-brand);
+		box-shadow: 0 0 12px rgba(2, 132, 199, 0.35);
 	}
 
 	/* Posts Grid */
 	.posts-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: var(--spacing-12) var(--spacing-8);
+		gap: var(--spacing-10) var(--spacing-8);
+	}
+
+	.post-card-container {
+		width: 100%;
+		transition: opacity 0.3s ease;
 	}
 
 	/* Empty State */
@@ -456,21 +537,16 @@ function formatDate(date: Date | null | undefined) {
 		gap: var(--spacing-3);
 		text-align: center;
 		padding: var(--spacing-20) var(--spacing-6);
-		max-width: 400px;
+		max-width: 450px;
 		margin: 0 auto;
 	}
 
 	.empty-state h2 {
 		font-size: var(--font-size-2xl);
-		font-weight: var(--font-weight-heading);
-	}
-
-	.empty-state p {
-		color: var(--color-muted);
+		font-weight: 700;
 	}
 
 	.btn {
-		display: inline-block;
 		margin-top: var(--spacing-4);
 		padding: var(--spacing-3) var(--spacing-6);
 		background: var(--color-brand);
@@ -478,86 +554,45 @@ function formatDate(date: Date | null | undefined) {
 		text-decoration: none;
 		border-radius: var(--radius);
 		font-size: var(--font-size-sm);
-		font-weight: 500;
-		transition: background var(--transition-fast);
-	}
-
-	.btn:hover {
-		background: var(--color-brand-hover);
+		font-weight: 600;
 	}
 
 	/* Responsive */
 	@media (max-width: 900px) {
-		.home-content {
-			padding: var(--spacing-6) var(--spacing-4) var(--spacing-12);
+		.heatmap-card,
+		.calendar-card {
+			height: 440px;
 		}
 
 		.posts-grid {
 			grid-template-columns: repeat(2, 1fr);
-			gap: var(--spacing-8) var(--spacing-6);
 		}
 	}
 
-	@media (max-width: 600px) {
+	@media (max-width: 640px) {
+		.home-content {
+			padding: var(--spacing-4) var(--spacing-4) var(--spacing-12);
+		}
+
 		.featured-title {
-			font-size: var(--font-size-2xl);
+			font-size: 2rem;
+		}
+
+		.desks-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 1rem;
+		}
+
+		.sector-filter-bar {
+			width: 100%;
+			flex-wrap: nowrap;
+			padding-bottom: 0.5rem;
 		}
 
 		.posts-grid {
 			grid-template-columns: 1fr;
 			gap: var(--spacing-8);
-		}
-	}
-/* 📊 S&P 500 Heatmap Styles */
-	.heatmap-section {
-		margin-bottom: var(--spacing-16);
-		padding-bottom: var(--spacing-12);
-		border-bottom: 1px solid var(--color-border-subtle);
-		width: 100%;
-	}
-
-	.section-subtitle {
-		font-size: var(--font-size-sm);
-		color: var(--color-muted);
-		margin-top: 4px;
-	}
-
-	.heatmap-card {
-		width: 100%;
-		height: 520px;
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		border: 1px solid var(--color-border-subtle);
-		background: #0f172a;
-		box-shadow: var(--shadow-md);
-	}
-
-	@media (max-width: 768px) {
-		.heatmap-card {
-			height: 420px;
-		}
-	}
-/* 📅 Economic Calendar Styles */
-	.calendar-section {
-		margin-bottom: var(--spacing-16);
-		padding-bottom: var(--spacing-12);
-		border-bottom: 1px solid var(--color-border-subtle);
-		width: 100%;
-	}
-
-	.calendar-card {
-		width: 100%;
-		height: 520px;
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		border: 1px solid var(--color-border-subtle);
-		background: #0f172a;
-		box-shadow: var(--shadow-md);
-	}
-
-	@media (max-width: 768px) {
-		.calendar-card {
-			height: 440px;
 		}
 	}
 </style>
