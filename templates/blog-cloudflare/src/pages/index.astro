@@ -1,598 +1,848 @@
 ---
 import {
+	getEmDashEntry,
 	getEmDashCollection,
 	getTermsForEntries,
+	getSeoMeta,
+	decodeSlug,
 	getSiteSettings,
 } from "emdash";
-import { Image } from "emdash/ui";
-import Base from "../layouts/Base.astro";
-import PostCard from "../components/PostCard.astro";
-import { getReadingTime } from "../utils/reading-time";
-import { resolveBlogSiteIdentity } from "../utils/site-identity";
+import {
+	Image,
+	PortableText,
+	WidgetArea,
+} from "emdash/ui";
+import { Comments, CommentForm } from "emdash/ui/comments";
+import Base from "../../layouts/Base.astro";
+import PostCard from "../../components/PostCard.astro";
+import { getReadingTime } from "../../utils/reading-time";
+import { resolveBlogSiteIdentity } from "../../utils/site-identity";
 
-// Increased limit so editorial desks display ample market research
-const POSTS_PER_PAGE = 12;
+const slug = decodeSlug(Astro.params.slug);
 
-const [{ entries: posts, cacheHint }, settings] = await Promise.all([
-	getEmDashCollection("posts", {
-		orderBy: { published_at: "desc" },
-		limit: POSTS_PER_PAGE + 1,
-	}),
-	getSiteSettings(),
-]);
-const { siteTitle, siteTagline } = resolveBlogSiteIdentity(settings);
+if (!slug) {
+	return Astro.redirect("/404");
+}
+
+const { entry: post, cacheHint } = await getEmDashEntry("posts", slug);
+
+if (!post) {
+	return Astro.redirect("/404");
+}
 
 if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
 
-const visiblePosts = posts.slice(0, POSTS_PER_PAGE);
-const hasMorePosts = posts.length > POSTS_PER_PAGE;
+function getImageUrl(img: unknown): string | undefined {
+	if (!img || typeof img !== "object") return undefined;
+	const image = img as Record<string, unknown>;
+	if (typeof image.src === "string" && image.src) {
+		return image.src.startsWith("http")
+			? image.src
+			: `${Astro.url.origin}${image.src}`;
+	}
+	const meta = image.meta as Record<string, unknown> | undefined;
+	const storageKey =
+		(typeof meta?.storageKey === "string" ? meta.storageKey : undefined) ||
+		(typeof image.id === "string" ? image.id : undefined);
+	if (storageKey) {
+		return `${Astro.url.origin}/_emdash/api/media/file/${storageKey}`;
+	}
+	return undefined;
+}
+const featuredImageUrl = getImageUrl(post.data.featured_image);
+const { siteTitle } = resolveBlogSiteIdentity(await getSiteSettings());
 
-// Find the first post with a featured image for the hero
-const featuredPost = visiblePosts.find((p) => p.data.featured_image);
-const featuredIndex = featuredPost ? visiblePosts.indexOf(featuredPost) : -1;
+const seo = getSeoMeta(post, {
+	siteTitle,
+	siteUrl: Astro.url.origin,
+	path: `/posts/${slug}`,
+	defaultOgImage: featuredImageUrl,
+});
 
-// Remaining posts for the sector desks
-const gridPosts = visiblePosts.filter((_, i) => i !== featuredIndex);
+const bylines = post.data.bylines ?? [];
+const readingTime = getReadingTime(post.data.content);
+const tags = post.data.terms?.tag ?? [];
 
-const entryIds = [
-	...(featuredPost ? [featuredPost.data.id] : []),
-	...gridPosts.map((p) => p.data.id),
-];
+const { entries: recentPosts } = await getEmDashCollection("posts", {
+	orderBy: { published_at: "desc" },
+	limit: 4,
+});
+const otherPosts = recentPosts.filter((p) => p.id !== post.id).slice(0, 3);
 
-// Single batched query for both tags AND categories
-const [tagsByEntry, categoriesByEntry] = await Promise.all([
-	getTermsForEntries("posts", entryIds, "tag"),
-	getTermsForEntries("posts", entryIds, "category"),
-]);
-
-const featuredTags = featuredPost
-	? (tagsByEntry.get(featuredPost.data.id) ?? []).map((t) => ({
-			slug: t.slug,
-			label: t.label,
-		}))
-	: [];
-const featuredCategories = featuredPost
-	? (categoriesByEntry.get(featuredPost.data.id) ?? []).map((c) => ({
-			slug: c.slug,
-			label: c.label,
-		}))
-	: [];
-const featuredBylines = featuredPost?.data.bylines ?? [];
-
-const gridPostsWithMeta = gridPosts.map((post) => ({
-	post,
-	tags: (tagsByEntry.get(post.data.id) ?? []).map((t) => ({
-		slug: t.slug,
-		label: t.label,
-	})),
-	categories: (categoriesByEntry.get(post.data.id) ?? []).map((c) => ({
-		slug: c.slug,
-		label: c.label,
-	})),
-	bylines: post.data.bylines ?? [],
+const otherTagsByEntry = await getTermsForEntries(
+	"posts",
+	otherPosts.map((p) => p.data.id),
+	"tag",
+);
+const otherPostsWithTags = otherPosts.map((p) => ({
+	post: p,
+	tags: otherTagsByEntry.get(p.data.id) ?? [],
+	bylines: p.data.bylines ?? [],
 }));
 
-// Collect unique categories present on posts for dynamic filter pills
-const availableCategories = Array.from(
-	new Map(
-		gridPostsWithMeta
-			.flatMap((p) => p.categories)
-			.map((c) => [c.slug, c])
-	).values()
-);
-
-function formatDate(date: Date | null | undefined) {
-	if (!date) return null;
-	return date.toLocaleDateString("en-US", {
+const publishDate =
+	post.data.publishedAt?.toLocaleDateString("en-US", {
 		year: "numeric",
-		month: "short",
+		month: "long",
 		day: "numeric",
-	});
-}
+	}) ?? null;
 ---
 
-<Base title={siteTitle} description={siteTagline}>
-	{
-		posts.length === 0 ? (
-			<section class="empty-state">
-				<h2>No market analysis published yet</h2>
-				<p>Create your first equity research breakdown in the admin panel.</p>
-				<a href="/_emdash/admin/content/posts/new" class="btn">
-					Write Market Report
-				</a>
-			</section>
-		) : (
-			<div class="home-content">
-				{/* 1. FEATURED HERO POST - Title on TOP, Full-width Chart BELOW */}
-				{featuredPost && (
-					<section class="featured-section">
-						<div class="featured-hero-container">
-							<div class="featured-content">
-								<div class="featured-meta">
-									{featuredCategories.length > 0 && (
-										<span class="sector-badge">{featuredCategories[0].label}</span>
-									)}
-									{featuredBylines.length > 0 && (
-										<>
-											<span class="featured-byline-name">
-												{featuredBylines[0].byline.displayName}
-											</span>
-											<span class="meta-dot" />
-										</>
-									)}
-									{formatDate(featuredPost.data.publishedAt) && (
-										<time>{formatDate(featuredPost.data.publishedAt)}</time>
-									)}
-									<span class="meta-dot" />
-									<span>{getReadingTime(featuredPost.data.content)} min read</span>
+<Base
+	title={seo.title}
+	pageTitle={seo.ogTitle}
+	description={seo.description}
+	image={seo.ogImage}
+	canonical={seo.canonical}
+	robots={seo.robots}
+	type="article"
+	publishedTime={post.data.publishedAt?.toISOString() ?? null}
+	modifiedTime={post.data.updatedAt.toISOString()}
+	content={{ collection: "posts", id: post.data.id, slug }}
+>
+	<article class="article">
+		{
+			post.data.featured_image && (
+				<div class="article-hero" {...post.edit.featured_image}>
+					<Image image={post.data.featured_image} />
+				</div>
+			)
+		}
+
+		<div class="article-grid">
+			<aside class="article-meta-col">
+				<div class="meta-sticky">
+					{
+						bylines.length > 0 && (
+							<div class="meta-block byline-block">
+								<span class="meta-label">
+									{bylines.length === 1 ? "Author" : "Authors"}
+								</span>
+								<div class="bylines">
+									{bylines.map((credit) => (
+										<div class="byline">
+											{credit.byline.avatarMediaId && (
+												<img
+													src={`/_emdash/api/media/file/${credit.byline.avatarMediaId}`}
+													alt={credit.byline.displayName}
+													class="byline-avatar"
+												/>
+											)}
+											<div class="byline-info">
+												<span class="byline-name">
+													{credit.byline.displayName}
+												</span>
+												{credit.roleLabel && (
+													<span class="byline-role">{credit.roleLabel}</span>
+												)}
+											</div>
+										</div>
+									))}
 								</div>
+							</div>
+						)
+					}
+					{
+						publishDate && (
+							<div class="meta-block">
+								<span class="meta-label">Published</span>
+								<time class="meta-value">{publishDate}</time>
+							</div>
+						)
+					}
+					<div class="meta-block">
+						<span class="meta-label">Reading time</span>
+						<span class="meta-value">{readingTime} min</span>
+					</div>
+					{
+						tags.length > 0 && (
+							<div class="meta-block">
+								<span class="meta-label">Tags</span>
+								<div class="meta-tags">
+									{tags.map((t) => (
+										<a href={`/tag/${t.slug}`} class="meta-tag">
+											#{t.label}
+										</a>
+									))}
+								</div>
+							</div>
+						)
+					}
+				</div>
+			</aside>
 
-								<a href={`/posts/${featuredPost.id}`} class="featured-title-link">
-									<h1 class="featured-title">{featuredPost.data.title}</h1>
-								</a>
-
-								{featuredPost.data.excerpt && (
-									<p class="featured-excerpt">{featuredPost.data.excerpt}</p>
-								)}
-
-								{featuredTags.length > 0 && (
-									<div class="featured-tags">
-										{featuredTags.map((tag) => (
-											<a href={`/tag/${tag.slug}`} class="featured-tag">
-												#{tag.label}
-											</a>
+			<div class="article-main">
+				<header class="article-header">
+					<div class="article-meta">
+						{
+							bylines.length > 0 && (
+								<>
+									<span class="article-meta-byline">
+										{bylines.map((credit, i) => (
+											<>
+												{i > 0 && ", "}
+												{credit.byline.displayName}
+											</>
 										))}
-									</div>
-								)}
-							</div>
+									</span>
+									<span class="meta-dot" />
+								</>
+							)
+						}
+						{
+							publishDate && (
+								<>
+									<time>{publishDate}</time>
+									<span class="meta-dot" />
+								</>
+							)
+						}
+						<span>{readingTime} min read</span>
+					</div>
 
-							<a href={`/posts/${featuredPost.id}`} class="featured-image-link">
-								<div class="featured-image">
-									<Image image={featuredPost.data.featured_image} />
-								</div>
+					<h1 class="article-title" {...post.edit.title}>{post.data.title}</h1>
+					
+					{
+						post.data.excerpt && (
+							<p class="article-excerpt" {...post.edit.excerpt}>{post.data.excerpt}</p>
+						)
+					}
+
+					<!-- 🚀 INVESTOR SOCIAL SHARE BAR -->
+					<div class="financial-share-bar">
+						<span class="share-label">Share Analysis:</span>
+						<div class="share-buttons">
+							<a 
+								href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(Astro.url.href)}`} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								class="share-btn share-x" 
+								title="Share on X"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+								<span>Post</span>
 							</a>
-						</div>
-					</section>
-				)}
 
-				{/* 2. S&P 500 SECTOR PERFORMANCE HEATMAP */}
-				<section class="heatmap-section">
-					<header class="section-header">
-						<div>
-							<h2 class="section-title">Market Pulse: S&P 500 Heatmap</h2>
-							<p class="section-subtitle">Live performance by sector and market capitalization</p>
-						</div>
-					</header>
+							<a 
+								href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(Astro.url.href)}`} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								class="share-btn share-linkedin" 
+								title="Share on LinkedIn"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9h2.77v8.37H6.46v-8.37M7.84 6.2a1.62 1.62 0 0 0-1.62 1.62c0 .9.72 1.63 1.62 1.63a1.63 1.63 0 0 0 1.63-1.63c0-.9-.73-1.62-1.63-1.62"/></svg>
+								<span>Share</span>
+							</a>
 
-					<div class="heatmap-card">
-						<div class="tradingview-widget-container">
-							<div class="tradingview-widget-container__widget"></div>
-							<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async is:inline>
-							{
-								"exchanges": [],
-								"dataSource": "SPX500",
-								"grouping": "sector",
-								"blockSize": "market_cap_calc",
-								"blockColor": "change",
-								"locale": "en",
-								"symbolUrl": "",
-								"colorTheme": "dark",
-								"hasTopBar": false,
-								"isDataSetEnabled": false,
-								"isZoomEnabled": true,
-								"hasSymbolTooltip": true,
-								"isMonoSize": false,
-								"width": "100%",
-								"height": "520"
-							}
-							</script>
+							<a 
+								href={`https://t.me/share/url?url=${encodeURIComponent(Astro.url.href)}&text=${encodeURIComponent(post.data.title)}`} 
+								target="_blank" 
+								rel="noopener noreferrer" 
+								class="share-btn share-telegram" 
+								title="Share on Telegram"
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+								<span>Telegram</span>
+							</a>
+
+							<button type="button" class="share-btn share-copy" id="copyLinkBtn" title="Copy Article Link">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+								<span id="copyText">Copy Link</span>
+							</button>
 						</div>
 					</div>
-				</section>
+				</header>
 
-				{/* 3. LIVE MACRO & ECONOMIC CALENDAR */}
-				<section class="calendar-section">
-					<header class="section-header">
-						<div>
-							<h2 class="section-title">Macro Catalysts: Economic Calendar</h2>
-							<p class="section-subtitle">Real-time US economic events: Fed interest rate decisions, CPI inflation, and jobs data</p>
-						</div>
-					</header>
+				<div class="article-content">
+					<PortableText value={post.data.content} />
+				</div>
 
-					<div class="calendar-card">
-						<div class="tradingview-widget-container">
-							<div class="tradingview-widget-container__widget"></div>
-							<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async is:inline>
-							{
-								"colorTheme": "dark",
-								"isTransparent": false,
-								"width": "100%",
-								"height": "520",
-								"locale": "en",
-								"importanceFilter": "0,1",
-								"countryFilter": "us"
-							}
-							</script>
-						</div>
+				<!-- ⚖️ INSTITUTIONAL ANALYST DISCLOSURE BOX -->
+				<div class="analyst-disclosure-card">
+					<div class="disclosure-header">
+						<span class="disclosure-badge">ANALYST DISCLOSURE & INTEGRITY</span>
 					</div>
-				</section>
+					<div class="disclosure-body">
+						<p>
+							<strong>Position Disclosure:</strong> The author of this research report hold a personal investment or trading position in the individual securities mentioned in this article, and plans to initiate any positions within the next 72 hours.
+						</p>
+						<p>
+							<strong>Editorial Independence:</strong> US Stocks Market operates with strict editorial separation from financial sponsors and trading desks. This article expresses independent technical and macro observations researchers and does not constitute a buy, sell, or hold recommendation. Always conduct your own due diligence before entering any market position.
+						</p>
+					</div>
+				</div>
 
-				{/* 4. SECTOR EDITORIAL DESKS WITH INTERACTIVE FILTERING */}
-				{gridPostsWithMeta.length > 0 && (
-					<section class="editorial-desks-section">
-						<header class="desks-header">
-							<div>
-								<h2 class="section-title">Market Coverage & Research Desks</h2>
-								<p class="section-subtitle">In-depth technical analysis, macro policy, and trade execution</p>
-							</div>
-
-							<!-- Interactive Filter Bar -->
-							<div class="sector-filter-bar">
-								<button class="filter-btn active" data-filter="all">All Coverage</button>
-								{availableCategories.map((cat) => (
-									<button class="filter-btn" data-filter={cat.slug}>
-										{cat.label}
-									</button>
-								))}
-							</div>
-						</header>
-
-						<div class="posts-grid" id="postsGrid">
-							{gridPostsWithMeta.map(({ post, tags, categories, bylines }) => (
-								<div 
-									class="post-card-container" 
-									data-categories={categories.map((c) => c.slug).join(",")}
-								>
-									<PostCard
-										title={post.data.title ?? "Untitled"}
-										excerpt={post.data.excerpt}
-										featuredImage={post.data.featured_image}
-										href={`/posts/${post.id}`}
-										date={post.data.publishedAt ?? undefined}
-										readingTime={getReadingTime(post.data.content)}
-										tags={tags}
-										bylines={bylines}
-									/>
-								</div>
-							))}
-						</div>
-					</section>
-				)}
+				<div class="article-comments">
+					<Comments collection="posts" contentId={post.data.id} threaded />
+					<CommentForm collection="posts" contentId={post.data.id} />
+				</div>
 			</div>
+
+			<aside class="article-sidebar">
+				<div class="sidebar-sticky">
+					<nav class="toc" aria-label="Table of contents">
+						<h4 class="toc-title">On this page</h4>
+						<div class="toc-content" id="toc-content"></div>
+					</nav>
+					<div class="sidebar-widgets">
+						<WidgetArea name="sidebar" />
+					</div>
+				</div>
+			</aside>
+		</div>
+	</article>
+
+	{
+		otherPostsWithTags.length > 0 && (
+			<section class="more-posts">
+				<div class="more-inner">
+					<h2 class="more-title">Continue reading</h2>
+					<div class="more-grid">
+						{otherPostsWithTags.map(
+							({ post: p, tags: postTags, bylines: postBylines }) => (
+								<PostCard
+									title={p.data.title}
+									excerpt={p.data.excerpt}
+									featuredImage={p.data.featured_image}
+									href={`/posts/${p.id}`}
+									date={p.data.publishedAt ?? undefined}
+									readingTime={getReadingTime(p.data.content)}
+									tags={postTags.map((t) => ({ slug: t.slug, label: t.label }))}
+									bylines={postBylines}
+								/>
+							)
+						)}
+					</div>
+				</div>
+			</section>
 		)
 	}
 
-	<!-- ⚡ CLIENT-SIDE INSTANT SECTOR FILTER SCRIPT -->
+	<!-- 📈 SMART CLIENT-SIDE SCRIPTS (CHARTS, SHARE BUTTONS, TOC) -->
 	<script is:inline>
-		function initSectorFilters() {
-			const buttons = document.querySelectorAll(".filter-btn");
-			const cards = document.querySelectorAll(".post-card-container");
+		function initStockChartsAndEmbeds() {
+			const content = document.querySelector(".article-content");
+			if (!content) return;
 
-			buttons.forEach((btn) => {
-				btn.addEventListener("click", () => {
-					buttons.forEach((b) => b.classList.remove("active"));
-					btn.classList.add("active");
+			content.querySelectorAll("p").forEach((p) => {
+				const rawText = p.textContent || "";
 
-					const filter = btn.getAttribute("data-filter");
+				// Flexible Match for [chart:TICKER]
+				const chartMatch = rawText.match(/\[chart:\s*([A-Za-z0-9_:-]+)\s*\]/i);
+				if (chartMatch) {
+					const rawSymbol = chartMatch[1].toUpperCase();
+					const symbol = rawSymbol.includes(":") ? rawSymbol : `NASDAQ:${rawSymbol}`;
 
-					cards.forEach((card) => {
-						const cardCategories = card.getAttribute("data-categories") || "";
-						if (filter === "all" || cardCategories.split(",").includes(filter)) {
-							card.style.display = "block";
-						} else {
-							card.style.display = "none";
-						}
-					});
-				});
+					const chartWrapper = document.createElement("div");
+					chartWrapper.style.cssText =
+						"width: 100%; height: 500px; margin: 2rem 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: #0f172a;";
+					
+					chartWrapper.innerHTML = `
+						<iframe 
+							src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=${encodeURIComponent(symbol)}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=0f172a&theme=dark&style=1&timezone=Etc%2FUTC&locale=en" 
+							style="width: 100%; height: 100%; border: 0;" 
+							allowtransparency="true" 
+							allowfullscreen 
+							scrolling="no">
+						</iframe>
+					`;
+
+					p.replaceWith(chartWrapper);
+				}
 			});
 		}
 
+		function initCopyButton() {
+			const copyBtn = document.getElementById("copyLinkBtn");
+			const copyText = document.getElementById("copyText");
+			if (copyBtn && copyText) {
+				copyBtn.addEventListener("click", () => {
+					navigator.clipboard.writeText(window.location.href).then(() => {
+						copyText.textContent = "Copied! ✓";
+						setTimeout(() => {
+							copyText.textContent = "Copy Link";
+						}, 2000);
+					});
+				});
+			}
+		}
+
+		function buildToc() {
+			const content = document.querySelector(".article-content");
+			const tocContainer = document.getElementById("toc-content");
+			if (!content || !tocContainer) return;
+
+			const headings = content.querySelectorAll("h2, h3");
+			if (headings.length === 0) {
+				const toc = document.querySelector(".toc");
+				if (toc) toc.style.display = "none";
+				return;
+			}
+
+			const list = document.createElement("ul");
+			list.className = "toc-list";
+
+			headings.forEach((heading, index) => {
+				if (!heading.id) {
+					heading.id = `heading-${index}`;
+				}
+
+				const li = document.createElement("li");
+				li.className =
+					heading.tagName === "H3" ? "toc-item toc-item--nested" : "toc-item";
+
+				const link = document.createElement("a");
+				link.href = `#${heading.id}`;
+				link.className = "toc-link";
+				link.textContent = heading.textContent;
+
+				li.appendChild(link);
+				list.appendChild(li);
+			});
+
+			tocContainer.appendChild(list);
+
+			const observer = new IntersectionObserver(
+				(entries) => {
+					entries.forEach((entry) => {
+						const id = entry.target.id;
+						const link = tocContainer.querySelector(`a[href="#${id}"]`);
+						if (link) {
+							if (entry.isIntersecting) {
+								tocContainer
+									.querySelectorAll(".toc-link")
+									.forEach((l) => l.classList.remove("active"));
+								link.classList.add("active");
+							}
+						}
+					});
+				},
+				{ rootMargin: "-80px 0px -80% 0px" }
+			);
+
+			headings.forEach((heading) => observer.observe(heading));
+		}
+
 		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", initSectorFilters);
+			document.addEventListener("DOMContentLoaded", () => {
+				initStockChartsAndEmbeds();
+				initCopyButton();
+				buildToc();
+			});
 		} else {
-			initSectorFilters();
+			initStockChartsAndEmbeds();
+			initCopyButton();
+			buildToc();
 		}
 	</script>
 </Base>
 
 <style>
-	.home-content {
+	.article {
 		max-width: var(--wide-width);
 		margin: 0 auto;
-		padding: var(--spacing-8) var(--spacing-6) var(--spacing-16);
 	}
 
-	/* Hero Section */
-	.featured-section {
-		margin-bottom: var(--spacing-16);
-		padding-bottom: var(--spacing-12);
-		border-bottom: 1px solid var(--color-border-subtle);
+	.article-hero {
+		margin: var(--spacing-16) var(--spacing-6);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		background: var(--color-surface);
 	}
 
-	.featured-hero-container {
-		display: flex;
-		flex-direction: column;
-		gap: var(--spacing-6);
-		max-width: 1000px;
-		margin: 0 auto;
+	.article-hero img {
+		width: 100%;
+		height: auto;
+		max-height: 500px;
+		object-fit: cover;
 	}
 
-	.featured-content {
-		display: flex;
-		flex-direction: column;
-		gap: var(--spacing-3);
-		text-align: left;
+	.article-grid {
+		display: grid;
+		grid-template-columns:
+			var(--meta-col-width) minmax(0, var(--content-width))
+			var(--gutter-width);
+		gap: var(--spacing-10);
+		justify-content: center;
+		padding: 0 var(--spacing-6);
+		margin: var(--spacing-16) 0;
 	}
 
-	.sector-badge {
-		font-size: 0.72rem;
-		font-weight: 700;
+	.article-meta-col {
+		display: block;
+	}
+
+	.meta-sticky {
+		position: sticky;
+		top: calc(var(--nav-height) + var(--spacing-8));
+	}
+
+	.meta-block {
+		margin-bottom: var(--spacing-6);
+	}
+
+	.meta-label {
+		display: block;
+		font-size: var(--font-size-xs);
+		font-weight: 500;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		padding: 0.2rem 0.6rem;
-		border-radius: 4px;
-		background: rgba(2, 132, 199, 0.15);
-		color: #38bdf8;
-		border: 1px solid rgba(56, 189, 248, 0.3);
+		letter-spacing: var(--tracking-wide);
+		color: var(--color-muted);
+		margin-bottom: var(--spacing-1);
 	}
 
-	.featured-meta {
+	.meta-value {
+		display: block;
+		font-size: var(--font-size-sm);
+		color: var(--color-text-secondary);
+	}
+
+	.meta-tags {
 		display: flex;
+		flex-wrap: wrap;
+		gap: var(--spacing-1);
+	}
+
+	.meta-tag {
+		display: inline-block;
+		padding: var(--tag-padding-y) var(--spacing-2);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-secondary);
+		background: var(--color-surface);
+		border-radius: var(--radius);
+		text-decoration: none;
+		transition: color var(--transition-fast), background var(--transition-fast);
+	}
+
+	.meta-tag:hover {
+		color: var(--color-text);
+		background: var(--color-border);
+	}
+
+	.bylines {
+		display: flex;
+		flex-direction: column;
+		gap: var(--spacing-1);
+	}
+
+	.byline {
+		display: flex;
+		align-items: center;
+		gap: var(--spacing-2);
+	}
+
+	.byline-avatar {
+		width: var(--avatar-size-lg);
+		height: var(--avatar-size-lg);
+		border-radius: 50%;
+		object-fit: cover;
+	}
+
+	.byline-info {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.byline-name {
+		font-size: var(--font-size-sm);
+		font-weight: 500;
+		color: var(--color-text);
+	}
+
+	.byline-role {
+		font-size: var(--font-size-xs);
+		color: var(--color-muted);
+	}
+
+	.article-main {
+		min-width: 0;
+	}
+
+	.article-header {
+		margin-bottom: var(--spacing-8);
+	}
+
+	.article-header .article-meta {
+		display: none;
 		align-items: center;
 		flex-wrap: wrap;
 		column-gap: var(--spacing-3);
 		row-gap: var(--spacing-1);
 		font-size: var(--font-size-sm);
 		color: var(--color-muted);
+		margin-bottom: var(--spacing-4);
 	}
 
-	.meta-dot {
-		width: 3px;
-		height: 3px;
-		border-radius: 50%;
-		background: var(--color-muted);
+	.article-meta-byline {
+		font-weight: 500;
+		color: var(--color-text-secondary);
 	}
 
-	.featured-byline-name {
-		font-weight: 600;
-		color: var(--color-text);
+	.article-title {
+		font-size: clamp(2rem, 5vw, var(--font-size-5xl));
+		font-weight: var(--font-weight-display);
+		line-height: var(--leading-tight);
+		letter-spacing: var(--tracking-tight);
+		margin-bottom: var(--spacing-4);
 	}
 
-	.featured-title-link {
-		text-decoration: none;
-		color: inherit;
-	}
-
-	.featured-title {
-		font-size: clamp(2rem, 5vw, 3.25rem);
-		font-weight: 800;
-		line-height: 1.15;
-		letter-spacing: -0.02em;
-		transition: color var(--transition-fast);
-		margin: var(--spacing-1) 0;
-	}
-
-	.featured-title-link:hover .featured-title {
-		color: var(--color-brand);
-	}
-
-	.featured-excerpt {
-		font-size: var(--font-size-lg);
+	.article-excerpt {
+		font-size: var(--font-size-xl);
 		line-height: var(--leading-relaxed);
 		color: var(--color-text-secondary);
-		max-width: 850px;
+		margin-bottom: var(--spacing-4);
 	}
 
-	.featured-tags {
+	/* 🚀 Share Bar Styles */
+	.financial-share-bar {
 		display: flex;
+		align-items: center;
 		flex-wrap: wrap;
-		gap: var(--spacing-2);
-		margin-top: var(--spacing-1);
-	}
-
-	.featured-tag {
-		font-size: var(--font-size-xs);
-		color: var(--color-muted);
-		text-decoration: none;
-		transition: color 0.2s;
-	}
-
-	.featured-tag:hover {
-		color: var(--color-brand);
-	}
-
-	.featured-image-link {
-		display: block;
-		width: 100%;
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-	}
-
-	.featured-image {
-		width: 100%;
-		background: var(--color-surface);
-	}
-
-	.featured-image img {
-		width: 100%;
-		height: auto;
-		max-height: 540px;
-		aspect-ratio: 16 / 9;
-		object-fit: cover;
-		transition: transform 0.4s ease;
-		display: block;
-	}
-
-	.featured-image-link:hover .featured-image img {
-		transform: scale(1.015);
-	}
-
-	/* Section Headers */
-	.section-header {
-		margin-bottom: var(--spacing-6);
-	}
-
-	.section-title {
-		font-size: var(--font-size-base);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--color-brand);
-	}
-
-	.section-subtitle {
-		font-size: var(--font-size-sm);
-		color: var(--color-muted);
-		margin-top: 3px;
-	}
-
-	/* Heatmap & Calendar Cards */
-	.heatmap-section,
-	.calendar-section {
-		margin-bottom: var(--spacing-16);
-		padding-bottom: var(--spacing-12);
-		border-bottom: 1px solid var(--color-border-subtle);
-		width: 100%;
-	}
-
-	.heatmap-card,
-	.calendar-card {
-		width: 100%;
-		height: 520px;
-		border-radius: var(--radius-lg);
-		overflow: hidden;
+		gap: 0.75rem;
+		margin: 1.5rem 0 1rem;
+		padding: 0.75rem 1rem;
+		background: rgba(255, 255, 255, 0.03);
 		border: 1px solid var(--color-border-subtle);
-		background: #0f172a;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+		border-radius: var(--radius);
 	}
 
-	/* Editorial Desks Layout */
-	.editorial-desks-section {
-		margin-top: var(--spacing-10);
+	.share-label {
+		font-size: var(--font-size-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wide);
+		color: var(--color-muted);
 	}
 
-	.desks-header {
+	.share-buttons {
 		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
-		flex-wrap: wrap;
-		gap: 1.25rem;
-		margin-bottom: var(--spacing-8);
-		padding-bottom: var(--spacing-4);
-		border-bottom: 1px solid var(--color-border-subtle);
-	}
-
-	/* Sector Filter Pills */
-	.sector-filter-bar {
-		display: flex;
+		align-items: center;
 		gap: 0.5rem;
 		flex-wrap: wrap;
-		overflow-x: auto;
-		-webkit-overflow-scrolling: touch;
 	}
 
-	.filter-btn {
-		background: var(--color-surface);
-		border: 1px solid var(--color-border-subtle);
-		color: var(--color-text-secondary);
-		padding: 0.4rem 0.9rem;
-		border-radius: 9999px;
+	.share-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.35rem 0.75rem;
+		border-radius: var(--radius);
 		font-size: var(--font-size-xs);
-		font-weight: 600;
+		font-weight: 500;
+		text-decoration: none;
+		color: var(--color-text);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
 		cursor: pointer;
 		transition: all 0.2s ease;
-		white-space: nowrap;
 	}
 
-	.filter-btn:hover {
-		color: var(--color-text);
-		border-color: var(--color-border);
-	}
-
-	.filter-btn.active {
-		background: var(--color-brand);
-		color: var(--color-on-brand);
+	.share-btn:hover {
 		border-color: var(--color-brand);
-		box-shadow: 0 0 12px rgba(2, 132, 199, 0.35);
+		color: var(--color-brand);
+		background: rgba(2, 132, 199, 0.1);
 	}
 
-	/* Posts Grid */
-	.posts-grid {
+	/* ⚖️ Analyst Disclosure Card */
+	.analyst-disclosure-card {
+		margin: 3rem 0 2rem;
+		padding: 1.5rem;
+		border-radius: var(--radius-lg);
+		background: rgba(15, 23, 42, 0.6);
+		border: 1px solid rgba(234, 179, 8, 0.35);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+
+	.disclosure-badge {
+		display: inline-block;
+		font-size: 0.7rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: #eab308;
+		background: rgba(234, 179, 8, 0.1);
+		border: 1px solid rgba(234, 179, 8, 0.3);
+		padding: 0.25rem 0.6rem;
+		border-radius: 4px;
+		margin-bottom: 0.75rem;
+	}
+
+	.disclosure-body p {
+		font-size: var(--font-size-sm);
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+		margin-bottom: 0.75rem;
+	}
+
+	.disclosure-body p:last-child {
+		margin-bottom: 0;
+	}
+
+	/* Article content typography */
+	.article-content {
+		font-size: var(--font-size-lg);
+		line-height: var(--leading-relaxed);
+	}
+
+	.article-content :global(p) {
+		margin-bottom: 1.5em;
+	}
+
+	.article-content :global(h2) {
+		font-size: var(--font-size-2xl);
+		margin-top: 2.5em;
+		margin-bottom: 0.75em;
+		scroll-margin-top: calc(var(--nav-height) + var(--spacing-4));
+	}
+
+	.article-content :global(h3) {
+		font-size: var(--font-size-xl);
+		margin-top: 2em;
+		margin-bottom: 0.5em;
+		scroll-margin-top: calc(var(--nav-height) + var(--spacing-4));
+	}
+
+	.article-content :global(blockquote) {
+		margin: 2em 0;
+		padding: var(--spacing-4) var(--spacing-6);
+		border-left: 3px solid var(--color-border);
+		background: var(--color-bg-subtle);
+		border-radius: 0 var(--radius) var(--radius) 0;
+		color: var(--color-text-secondary);
+		font-style: italic;
+	}
+
+	.article-content :global(ul),
+	.article-content :global(ol) {
+		margin-bottom: 1.5em;
+		padding-left: 1.5em;
+	}
+
+	.article-content :global(li) {
+		margin-bottom: 0.5em;
+	}
+
+	/* Right column: TOC + Sidebar */
+	.article-sidebar {
+		display: block;
+	}
+
+	.sidebar-sticky {
+		position: sticky;
+		top: calc(var(--nav-height) + var(--spacing-8));
+	}
+
+	.toc {
+		margin-bottom: var(--spacing-8);
+		padding-bottom: var(--spacing-6);
+		border-bottom: 1px solid var(--color-border-subtle);
+	}
+
+	.toc-title {
+		font-size: var(--font-size-xs);
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wide);
+		color: var(--color-muted);
+		margin-bottom: var(--spacing-3);
+	}
+
+	.toc-content :global(.toc-list) {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.toc-content :global(.toc-item) {
+		margin-bottom: var(--spacing-1);
+	}
+
+	.toc-content :global(.toc-item--nested) {
+		padding-left: var(--spacing-3);
+	}
+
+	.toc-content :global(.toc-link) {
+		display: block;
+		font-size: var(--font-size-sm);
+		color: var(--color-muted);
+		text-decoration: none;
+		padding: var(--spacing-1) 0;
+		transition: color var(--transition-fast);
+		line-height: var(--leading-snug);
+	}
+
+	.toc-content :global(.toc-link:hover),
+	.toc-content :global(.toc-link.active) {
+		color: var(--color-text);
+	}
+
+	.article-comments {
+		margin-top: var(--spacing-16);
+		padding-top: var(--spacing-10);
+		border-top: 1px solid var(--color-border);
+	}
+
+	.more-posts {
+		background: var(--color-bg-subtle);
+		padding: var(--spacing-16) 0;
+		margin-top: var(--spacing-16);
+	}
+
+	.more-inner {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: 0 var(--spacing-6);
+	}
+
+	.more-title {
+		font-size: var(--font-size-2xl);
+		font-weight: var(--font-weight-heading);
+		margin-bottom: var(--spacing-10);
+	}
+
+	.more-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: var(--spacing-10) var(--spacing-8);
+		gap: var(--spacing-8);
 	}
 
-	.post-card-container {
-		width: 100%;
-		transition: opacity 0.3s ease;
-	}
-
-	/* Empty State */
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--spacing-3);
-		text-align: center;
-		padding: var(--spacing-20) var(--spacing-6);
-		max-width: 450px;
-		margin: 0 auto;
-	}
-
-	.empty-state h2 {
-		font-size: var(--font-size-2xl);
-		font-weight: 700;
-	}
-
-	.btn {
-		margin-top: var(--spacing-4);
-		padding: var(--spacing-3) var(--spacing-6);
-		background: var(--color-brand);
-		color: var(--color-on-brand);
-		text-decoration: none;
-		border-radius: var(--radius);
-		font-size: var(--font-size-sm);
-		font-weight: 600;
-	}
-
-	/* Responsive */
-	@media (max-width: 900px) {
-		.heatmap-card,
-		.calendar-card {
-			height: 440px;
+	@media (max-width: 1100px) {
+		.article-grid {
+			grid-template-columns: minmax(0, var(--content-width));
+			gap: 0;
 		}
 
-		.posts-grid {
+		.article-meta-col,
+		.article-sidebar {
+			display: none;
+		}
+
+		.article-header .article-meta {
+			display: flex;
+		}
+	}
+
+	@media (max-width: 900px) {
+		.article-hero {
+			margin: var(--spacing-4) var(--spacing-4) var(--spacing-8);
+			border-radius: var(--radius);
+		}
+
+		.article-grid {
+			padding: 0 var(--spacing-4);
+		}
+
+		.more-grid {
 			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
-	@media (max-width: 640px) {
-		.home-content {
-			padding: var(--spacing-4) var(--spacing-4) var(--spacing-12);
+	@media (max-width: 600px) {
+		.article-title {
+			font-size: var(--font-size-3xl);
 		}
 
-		.featured-title {
-			font-size: 2rem;
-		}
-
-		.desks-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 1rem;
-		}
-
-		.sector-filter-bar {
-			width: 100%;
-			flex-wrap: nowrap;
-			padding-bottom: 0.5rem;
-		}
-
-		.posts-grid {
+		.more-grid {
 			grid-template-columns: 1fr;
-			gap: var(--spacing-8);
 		}
 	}
 </style>
