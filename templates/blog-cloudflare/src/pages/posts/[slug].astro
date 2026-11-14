@@ -32,7 +32,6 @@ if (!post) {
 
 if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
 
-// Get featured image URL for OG fallback
 function getImageUrl(img: unknown): string | undefined {
 	if (!img || typeof img !== "object") return undefined;
 	const image = img as Record<string, unknown>;
@@ -53,7 +52,6 @@ function getImageUrl(img: unknown): string | undefined {
 const featuredImageUrl = getImageUrl(post.data.featured_image);
 const { siteTitle } = resolveBlogSiteIdentity(await getSiteSettings());
 
-// Generate SEO meta from content
 const seo = getSeoMeta(post, {
 	siteTitle,
 	siteUrl: Astro.url.origin,
@@ -61,16 +59,10 @@ const seo = getSeoMeta(post, {
 	defaultOgImage: featuredImageUrl,
 });
 
-// Bylines are already hydrated by getEmDashEntry
 const bylines = post.data.bylines ?? [];
-
-// Get reading time
 const readingTime = getReadingTime(post.data.content);
-
-// Post tags
 const tags = post.data.terms?.tag ?? [];
 
-// Fetch recent posts
 const { entries: recentPosts } = await getEmDashCollection("posts", {
 	orderBy: { published_at: "desc" },
 	limit: 4,
@@ -109,7 +101,6 @@ const publishDate =
 	content={{ collection: "posts", id: post.data.id, slug }}
 >
 	<article class="article">
-		{/* Hero: Full-width featured image */}
 		{
 			post.data.featured_image && (
 				<div class="article-hero" {...post.edit.featured_image}>
@@ -118,9 +109,7 @@ const publishDate =
 			)
 		}
 
-		{/* Three-column layout */}
 		<div class="article-grid">
-			{/* Left gutter: Meta information */}
 			<aside class="article-meta-col">
 				<div class="meta-sticky">
 					{
@@ -172,7 +161,7 @@ const publishDate =
 								<div class="meta-tags">
 									{tags.map((t) => (
 										<a href={`/tag/${t.slug}`} class="meta-tag">
-											{t.label}
+											#{t.label}
 										</a>
 									))}
 								</div>
@@ -182,7 +171,6 @@ const publishDate =
 				</div>
 			</aside>
 
-			{/* Main content */}
 			<div class="article-main">
 				<header class="article-header">
 					<div class="article-meta">
@@ -213,15 +201,17 @@ const publishDate =
 					</div>
 
 					<h1 class="article-title" {...post.edit.title}>{post.data.title}</h1>
+					
 					{
 						post.data.excerpt && (
 							<p class="article-excerpt" {...post.edit.excerpt}>{post.data.excerpt}</p>
 						)
-<!-- 🚀 INVESTOR SOCIAL SHARE BAR -->
+					}
+
+					<!-- 🚀 INVESTOR SOCIAL SHARE BAR -->
 					<div class="financial-share-bar">
 						<span class="share-label">Share Analysis:</span>
 						<div class="share-buttons">
-							<!-- X / Twitter (FinTwit) -->
 							<a 
 								href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.data.title)}&url=${encodeURIComponent(Astro.url.href)}`} 
 								target="_blank" 
@@ -233,7 +223,6 @@ const publishDate =
 								<span>Post</span>
 							</a>
 
-							<!-- LinkedIn -->
 							<a 
 								href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(Astro.url.href)}`} 
 								target="_blank" 
@@ -245,7 +234,6 @@ const publishDate =
 								<span>Share</span>
 							</a>
 
-							<!-- Telegram -->
 							<a 
 								href={`https://t.me/share/url?url=${encodeURIComponent(Astro.url.href)}&text=${encodeURIComponent(post.data.title)}`} 
 								target="_blank" 
@@ -257,33 +245,31 @@ const publishDate =
 								<span>Telegram</span>
 							</a>
 
-							<!-- Copy Link Button -->
 							<button type="button" class="share-btn share-copy" id="copyLinkBtn" title="Copy Article Link">
 								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
 								<span id="copyText">Copy Link</span>
 							</button>
 						</div>
 					</div>
-					}
 				</header>
-<!-- ========================================================= -->
-				<!-- ⚖️ INSTITUTIONAL ANALYST DISCLOSURE & COMPLIANCE BOX       -->
-				<!-- ========================================================= -->
+
+				<div class="article-content">
+					<PortableText value={post.data.content} />
+				</div>
+
+				<!-- ⚖️ INSTITUTIONAL ANALYST DISCLOSURE BOX -->
 				<div class="analyst-disclosure-card">
 					<div class="disclosure-header">
 						<span class="disclosure-badge">ANALYST DISCLOSURE & INTEGRITY</span>
 					</div>
 					<div class="disclosure-body">
 						<p>
-							<strong>Position Disclosure:</strong> The author of this research report does hold a personal investment and trading position in the individual securities mentioned in this article, and still making more researches and plans to initiate any positions within the next 72 hours.
+							<strong>Position Disclosure:</strong> The author of this research report does not hold a personal investment or trading position in the individual securities mentioned in this article, nor plans to initiate any positions within the next 72 hours.
 						</p>
 						<p>
-							<strong>Editorial Independence:</strong> US Stocks Market operates with strict editorial separation from financial sponsors and trading desks. This article expresses independent technical and macro observations and does not constitute a buy, sell, or hold recommendation. Always conduct your own due diligence and risk assessment before entering any market position.
+							<strong>Editorial Independence:</strong> US Stocks Market operates with strict editorial separation from financial sponsors and trading desks. This article expresses independent technical and macro observations and does not constitute a buy, sell, or hold recommendation. Always conduct your own due diligence before entering any market position.
 						</p>
 					</div>
-				</div>
-				<div class="article-content">
-					<PortableText value={post.data.content} />
 				</div>
 
 				<div class="article-comments">
@@ -292,14 +278,11 @@ const publishDate =
 				</div>
 			</div>
 
-			{/* Right gutter: TOC + Sidebar widgets */}
 			<aside class="article-sidebar">
 				<div class="sidebar-sticky">
 					<nav class="toc" aria-label="Table of contents">
 						<h4 class="toc-title">On this page</h4>
-						<div class="toc-content" id="toc-content">
-							<!-- Populated by JS -->
-						</div>
+						<div class="toc-content" id="toc-content"></div>
 					</nav>
 					<div class="sidebar-widgets">
 						<WidgetArea name="sidebar" />
@@ -335,56 +318,55 @@ const publishDate =
 		)
 	}
 
-	<!-- 📈 SMART FINANCIAL CHART & EMBED SCRIPT -->
-	<script>
+	<!-- 📈 SMART CLIENT-SIDE SCRIPTS (CHARTS, SHARE BUTTONS, TOC) -->
+	<script is:inline>
 		function initStockChartsAndEmbeds() {
 			const content = document.querySelector(".article-content");
 			if (!content) return;
 
 			content.querySelectorAll("p").forEach((p) => {
-				const text = (p.textContent || "").trim();
+				const rawText = p.textContent || "";
 
-				// 1. Support [chart:TICKER] (e.g. [chart:NVDA], [chart:AAPL], [chart:SPY])
-				const chartMatch = text.match(/^\[chart:([A-Za-z0-9_:-]+)\]$/i);
+				// Flexible Match for [chart:TICKER]
+				const chartMatch = rawText.match(/\[chart:\s*([A-Za-z0-9_:-]+)\s*\]/i);
 				if (chartMatch) {
 					const rawSymbol = chartMatch[1].toUpperCase();
 					const symbol = rawSymbol.includes(":") ? rawSymbol : `NASDAQ:${rawSymbol}`;
 
 					const chartWrapper = document.createElement("div");
 					chartWrapper.style.cssText =
-						"width: 100%; height: 500px; margin: 2rem 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); background: #0f172a;";
+						"width: 100%; height: 500px; margin: 2rem 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: #0f172a;";
+					
+					chartWrapper.innerHTML = `
+						<iframe 
+							src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=${encodeURIComponent(symbol)}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=0f172a&theme=dark&style=1&timezone=Etc%2FUTC&locale=en" 
+							style="width: 100%; height: 100%; border: 0;" 
+							allowtransparency="true" 
+							allowfullscreen 
+							scrolling="no">
+						</iframe>
+					`;
 
-					const iframe = document.createElement("iframe");
-					iframe.src = `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_widget&symbol=${encodeURIComponent(
-						symbol
-					)}&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=0&toolbarbg=0f172a&theme=dark&style=1&timezone=Etc%2FUTC&locale=en`;
-					iframe.style.cssText = "width: 100%; height: 100%; border: 0;";
-					iframe.allowFullscreen = true;
-
-					chartWrapper.appendChild(iframe);
 					p.replaceWith(chartWrapper);
-					return;
-				}
-
-				// 2. Auto-unescape raw HTML / iframes if pasted directly
-				if (
-					text.includes("<iframe") ||
-					text.includes("widgetembed") ||
-					text.includes("<div") ||
-					text.includes("<h2") ||
-					text.includes("<ul") ||
-					text.includes("<!--")
-				) {
-					const temp = document.createElement("div");
-					temp.innerHTML = text;
-					p.replaceWith(...Array.from(temp.childNodes));
 				}
 			});
 		}
 
-		initStockChartsAndEmbeds();
+		function initCopyButton() {
+			const copyBtn = document.getElementById("copyLinkBtn");
+			const copyText = document.getElementById("copyText");
+			if (copyBtn && copyText) {
+				copyBtn.addEventListener("click", () => {
+					navigator.clipboard.writeText(window.location.href).then(() => {
+						copyText.textContent = "Copied! ✓";
+						setTimeout(() => {
+							copyText.textContent = "Copy Link";
+						}, 2000);
+					});
+				});
+			}
+		}
 
-		// Build table of contents from h2/h3 headings
 		function buildToc() {
 			const content = document.querySelector(".article-content");
 			const tocContainer = document.getElementById("toc-content");
@@ -392,7 +374,7 @@ const publishDate =
 
 			const headings = content.querySelectorAll("h2, h3");
 			if (headings.length === 0) {
-				const toc = document.querySelector(".toc") as HTMLElement | null;
+				const toc = document.querySelector(".toc");
 				if (toc) toc.style.display = "none";
 				return;
 			}
@@ -441,18 +423,26 @@ const publishDate =
 			headings.forEach((heading) => observer.observe(heading));
 		}
 
-		buildToc();
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", () => {
+				initStockChartsAndEmbeds();
+				initCopyButton();
+				buildToc();
+			});
+		} else {
+			initStockChartsAndEmbeds();
+			initCopyButton();
+			buildToc();
+		}
 	</script>
 </Base>
 
 <style>
-	/* Article container */
 	.article {
 		max-width: var(--wide-width);
 		margin: 0 auto;
 	}
 
-	/* Hero image - full width within container */
 	.article-hero {
 		margin: var(--spacing-16) var(--spacing-6);
 		border-radius: var(--radius-lg);
@@ -467,7 +457,6 @@ const publishDate =
 		object-fit: cover;
 	}
 
-	/* Three-column grid */
 	.article-grid {
 		display: grid;
 		grid-template-columns:
@@ -479,7 +468,6 @@ const publishDate =
 		margin: var(--spacing-16) 0;
 	}
 
-	/* Left column: Meta */
 	.article-meta-col {
 		display: block;
 	}
@@ -523,9 +511,7 @@ const publishDate =
 		background: var(--color-surface);
 		border-radius: var(--radius);
 		text-decoration: none;
-		transition:
-			color var(--transition-fast),
-			background var(--transition-fast);
+		transition: color var(--transition-fast), background var(--transition-fast);
 	}
 
 	.meta-tag:hover {
@@ -533,7 +519,6 @@ const publishDate =
 		background: var(--color-border);
 	}
 
-	/* Byline styles */
 	.bylines {
 		display: flex;
 		flex-direction: column;
@@ -569,13 +554,12 @@ const publishDate =
 		color: var(--color-muted);
 	}
 
-	/* Main content column */
 	.article-main {
 		min-width: 0;
 	}
 
 	.article-header {
-		margin-bottom: var(--spacing-10);
+		margin-bottom: var(--spacing-8);
 	}
 
 	.article-header .article-meta {
@@ -606,6 +590,91 @@ const publishDate =
 		font-size: var(--font-size-xl);
 		line-height: var(--leading-relaxed);
 		color: var(--color-text-secondary);
+		margin-bottom: var(--spacing-4);
+	}
+
+	/* 🚀 Share Bar Styles */
+	.financial-share-bar {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin: 1.5rem 0 1rem;
+		padding: 0.75rem 1rem;
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid var(--color-border-subtle);
+		border-radius: var(--radius);
+	}
+
+	.share-label {
+		font-size: var(--font-size-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-wide);
+		color: var(--color-muted);
+	}
+
+	.share-buttons {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.share-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.35rem 0.75rem;
+		border-radius: var(--radius);
+		font-size: var(--font-size-xs);
+		font-weight: 500;
+		text-decoration: none;
+		color: var(--color-text);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.share-btn:hover {
+		border-color: var(--color-brand);
+		color: var(--color-brand);
+		background: rgba(2, 132, 199, 0.1);
+	}
+
+	/* ⚖️ Analyst Disclosure Card */
+	.analyst-disclosure-card {
+		margin: 3rem 0 2rem;
+		padding: 1.5rem;
+		border-radius: var(--radius-lg);
+		background: rgba(15, 23, 42, 0.6);
+		border: 1px solid rgba(234, 179, 8, 0.35);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+
+	.disclosure-badge {
+		display: inline-block;
+		font-size: 0.7rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: #eab308;
+		background: rgba(234, 179, 8, 0.1);
+		border: 1px solid rgba(234, 179, 8, 0.3);
+		padding: 0.25rem 0.6rem;
+		border-radius: 4px;
+		margin-bottom: 0.75rem;
+	}
+
+	.disclosure-body p {
+		font-size: var(--font-size-sm);
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+		margin-bottom: 0.75rem;
+	}
+
+	.disclosure-body p:last-child {
+		margin-bottom: 0;
 	}
 
 	/* Article content typography */
@@ -677,28 +746,6 @@ const publishDate =
 		margin-bottom: 0.5em;
 	}
 
-	.article-content :global(img) {
-		margin: 2em 0;
-		border-radius: var(--radius-lg);
-	}
-
-	.article-content :global(hr) {
-		margin: 3em 0;
-		border: none;
-		border-top: 1px solid var(--color-border);
-	}
-
-	.article-content :global(a) {
-		color: var(--color-brand);
-		text-decoration: underline;
-		text-underline-offset: 3px;
-		text-decoration-thickness: 1px;
-	}
-
-	.article-content :global(a:hover) {
-		text-decoration-thickness: 2px;
-	}
-
 	/* Right column: TOC + Sidebar */
 	.article-sidebar {
 		display: block;
@@ -753,252 +800,12 @@ const publishDate =
 		color: var(--color-text);
 	}
 
-	/* Sidebar widgets */
-	.sidebar-widgets :global(.widget-area) {
-		display: flex;
-		flex-direction: column;
-		gap: var(--spacing-6);
-	}
-
-	.sidebar-widgets :global(.widget) {
-		font-size: var(--font-size-sm);
-	}
-
-	.sidebar-widgets :global(.widget__title) {
-		font-size: var(--font-size-xs);
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-wide);
-		color: var(--color-muted);
-		margin-bottom: var(--spacing-3);
-	}
-
-	.sidebar-widgets :global(.widget__content) {
-		color: var(--color-text-secondary);
-		line-height: var(--leading-relaxed);
-	}
-
-	/* Sidebar search widget */
-	.sidebar-widgets :global(.widget-search) {
-		display: flex;
-		flex-direction: column;
-		gap: var(--spacing-2);
-	}
-
-	.sidebar-widgets :global(.widget-search__input) {
-		width: 100%;
-		padding: var(--spacing-2) var(--spacing-3);
-		font-family: var(--font-body);
-		font-size: var(--font-size-sm);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius);
-		background: var(--color-bg);
-		color: var(--color-text);
-		transition:
-			border-color var(--transition-fast),
-			box-shadow var(--transition-fast);
-	}
-
-	.sidebar-widgets :global(.widget-search__input)::placeholder {
-		color: var(--color-muted);
-	}
-
-	.sidebar-widgets :global(.widget-search__input):focus,
-	.sidebar-widgets :global(.widget-search__input):focus-visible {
-		outline: none;
-		border-color: var(--color-brand);
-		box-shadow: 0 0 0 3px var(--color-brand-ring);
-	}
-
-	.sidebar-widgets :global(.widget-search__button) {
-		display: none;
-	}
-
-	/* Sidebar categories widget */
-	.sidebar-widgets :global(.widget-categories) {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.sidebar-widgets :global(.widget-categories li) {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: var(--spacing-2) 0;
-		border-bottom: 1px solid var(--color-border-subtle);
-	}
-
-	.sidebar-widgets :global(.widget-categories li:last-child) {
-		border-bottom: none;
-	}
-
-	.sidebar-widgets :global(.widget-categories__link) {
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		transition: color var(--transition-fast);
-	}
-
-	.sidebar-widgets :global(.widget-categories__link:hover) {
-		color: var(--color-text);
-	}
-
-	.sidebar-widgets :global(.widget-categories__count) {
-		font-size: var(--font-size-xs);
-		color: var(--color-muted);
-		background: var(--color-surface);
-		padding: var(--tag-padding-y) var(--spacing-2);
-		border-radius: var(--radius);
-	}
-
-	/* Sidebar tags widget - pill style */
-	.sidebar-widgets :global(.widget-tags__cloud) {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--spacing-2);
-	}
-
-	.sidebar-widgets :global(.widget-tags__cloud li) {
-		margin: 0;
-	}
-
-	.sidebar-widgets :global(.widget-tags__link) {
-		display: inline-block;
-		padding: var(--tag-padding-y) var(--spacing-2);
-		font-size: var(--font-size-xs);
-		color: var(--color-text-secondary);
-		background: var(--color-surface);
-		border-radius: var(--radius);
-		text-decoration: none;
-		transition:
-			color var(--transition-fast),
-			background var(--transition-fast);
-	}
-
-	.sidebar-widgets :global(.widget-tags__link:hover) {
-		color: var(--color-text);
-		background: var(--color-border);
-	}
-
-	.sidebar-widgets :global(.widget-tags__count) {
-		display: none;
-	}
-
-	/* Sidebar recent posts widget */
-	.sidebar-widgets :global(.widget-recent-posts) {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.sidebar-widgets :global(.widget-recent-posts li) {
-		padding: var(--spacing-2) 0;
-		border-bottom: 1px solid var(--color-border-subtle);
-	}
-
-	.sidebar-widgets :global(.widget-recent-posts li:last-child) {
-		border-bottom: none;
-	}
-
-	.sidebar-widgets :global(.widget-recent-posts a) {
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		transition: color var(--transition-fast);
-		line-height: var(--leading-snug);
-	}
-
-	.sidebar-widgets :global(.widget-recent-posts a:hover) {
-		color: var(--color-text);
-	}
-
-	/* Sidebar archives widget */
-	.sidebar-widgets :global(.widget-archives) {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.sidebar-widgets :global(.widget-archives li) {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: var(--spacing-2) 0;
-		border-bottom: 1px solid var(--color-border-subtle);
-	}
-
-	.sidebar-widgets :global(.widget-archives li:last-child) {
-		border-bottom: none;
-	}
-
-	.sidebar-widgets :global(.widget-archives__link) {
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		transition: color var(--transition-fast);
-	}
-
-	.sidebar-widgets :global(.widget-archives__link:hover) {
-		color: var(--color-text);
-	}
-
-	.sidebar-widgets :global(.widget-archives__count) {
-		font-size: var(--font-size-xs);
-		color: var(--color-muted);
-		background: var(--color-surface);
-		padding: var(--tag-padding-y) var(--spacing-2);
-		border-radius: var(--radius);
-	}
-
-	/* Comments section */
 	.article-comments {
 		margin-top: var(--spacing-16);
 		padding-top: var(--spacing-10);
 		border-top: 1px solid var(--color-border);
 	}
 
-	.article-comments :global(.ec-comments) {
-		--ec-comment-border: 1px solid var(--color-border);
-	}
-
-	.article-comments :global(.ec-comments-heading) {
-		font-size: var(--font-size-2xl);
-		font-weight: var(--font-weight-heading);
-		margin-bottom: var(--spacing-8);
-	}
-
-	.article-comments :global(.ec-comment-author) {
-		color: var(--color-text);
-	}
-
-	.article-comments :global(.ec-comment-date) {
-		font-family: var(--font-mono);
-		color: var(--color-muted);
-	}
-
-	.article-comments :global(.ec-comment-body) {
-		color: var(--color-text);
-	}
-
-	.article-comments :global(.ec-comment-form-field input),
-	.article-comments :global(.ec-comment-form-field textarea) {
-		background: var(--color-surface) !important;
-		border-color: var(--color-border) !important;
-		color: var(--color-text) !important;
-	}
-
-	.article-comments :global(.ec-comment-user-info) {
-		background: var(--color-surface) !important;
-		border-color: var(--color-border) !important;
-	}
-
-	.article-comments :global(.ec-comment-form-submit) {
-		background: var(--color-brand) !important;
-		color: var(--color-on-brand) !important;
-	}
-
-	/* More posts section */
 	.more-posts {
 		background: var(--color-bg-subtle);
 		padding: var(--spacing-16) 0;
@@ -1023,7 +830,6 @@ const publishDate =
 		gap: var(--spacing-8);
 	}
 
-	/* Responsive */
 	@media (max-width: 1100px) {
 		.article-grid {
 			grid-template-columns: minmax(0, var(--content-width));
@@ -1064,100 +870,4 @@ const publishDate =
 			grid-template-columns: 1fr;
 		}
 	}
-/* 🚀 Share Bar Styles */
-	.financial-share-bar {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 0.75rem;
-		margin: 1.5rem 0 2rem;
-		padding: 0.75rem 1rem;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid var(--color-border-subtle);
-		border-radius: var(--radius);
-	}
-
-	.share-label {
-		font-size: var(--font-size-xs);
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-wide);
-		color: var(--color-muted);
-	}
-
-	.share-buttons {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-
-	.share-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		padding: 0.35rem 0.75rem;
-		border-radius: var(--radius);
-		font-size: var(--font-size-xs);
-		font-weight: 500;
-		text-decoration: none;
-		color: var(--color-text);
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.share-btn:hover {
-		border-color: var(--color-brand);
-		color: var(--color-brand);
-		background: rgba(2, 132, 199, 0.1);
-	}
-
-	/* ⚖️ Analyst Disclosure Card */
-	.analyst-disclosure-card {
-		margin: 3rem 0 2rem;
-		padding: 1.5rem;
-		border-radius: var(--radius-lg);
-		background: rgba(15, 23, 42, 0.6);
-		border: 1px solid rgba(234, 179, 8, 0.3); /* Subtle gold warning border */
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-	}
-
-	.disclosure-badge {
-		display: inline-block;
-		font-size: 0.7rem;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		color: #eab308; /* Institutional gold */
-		background: rgba(234, 179, 8, 0.1);
-		border: 1px solid rgba(234, 179, 8, 0.3);
-		padding: 0.25rem 0.6rem;
-		border-radius: 4px;
-		margin-bottom: 0.75rem;
-	}
-
-	.disclosure-body p {
-		font-size: var(--font-size-sm);
-		line-height: 1.6;
-		color: var(--color-text-secondary);
-		margin-bottom: 0.75rem;
-	}
-
-	.disclosure-body p:last-child {
-		margin-bottom: 0;
-	}
-// Copy Link Handler
-		const copyBtn = document.getElementById("copyLinkBtn");
-		const copyText = document.getElementById("copyText");
-		if (copyBtn && copyText) {
-			copyBtn.addEventListener("click", () => {
-				navigator.clipboard.writeText(window.location.href).then(() => {
-					copyText.textContent = "Copied! ✓";
-					setTimeout(() => {
-						copyText.textContent = "Copy Link";
-					}, 2000);
-				});
-			});
-		}
 </style>
