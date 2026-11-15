@@ -160,32 +160,36 @@ function formatDate(date: Date | null | undefined) {
 					<header class="section-header">
 						<div>
 							<h2 class="section-title">Market Pulse: S&P 500 Heatmap</h2>
-							<p class="section-subtitle">Live performance by sector and market capitalization</p>
+							<p class="section-subtitle">Real-time equities performance by sector and market capitalization</p>
 						</div>
 					</header>
 
 					<div class="heatmap-card">
 						<div class="tradingview-widget-container">
 							<div class="tradingview-widget-container__widget"></div>
-							<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async is:inline>
-							{
-								"exchanges": [],
-								"dataSource": "SPX500",
-								"grouping": "sector",
-								"blockSize": "market_cap_calc",
-								"blockColor": "change",
-								"locale": "en",
-								"symbolUrl": "",
-								"colorTheme": "dark",
-								"hasTopBar": false,
-								"isDataSetEnabled": false,
-								"isZoomEnabled": true,
-								"hasSymbolTooltip": true,
-								"isMonoSize": false,
-								"width": "100%",
-								"height": "520"
-							}
-							</script>
+							<script 
+								type="text/javascript" 
+								src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" 
+								async 
+								is:inline 
+								set:html={`{
+									"exchanges": [],
+									"dataSource": "SPX500",
+									"grouping": "sector",
+									"blockSize": "market_cap_calc",
+									"blockColor": "change",
+									"locale": "en",
+									"symbolUrl": "",
+									"colorTheme": "dark",
+									"hasTopBar": false,
+									"isDataSetEnabled": false,
+									"isZoomEnabled": true,
+									"hasSymbolTooltip": true,
+									"isMonoSize": false,
+									"width": "100%",
+									"height": "520"
+								}`}
+							/>
 						</div>
 					</div>
 				</section>
@@ -195,24 +199,28 @@ function formatDate(date: Date | null | undefined) {
 					<header class="section-header">
 						<div>
 							<h2 class="section-title">Macro Catalysts: Economic Calendar</h2>
-							<p class="section-subtitle">Real-time US economic events: Fed interest rate decisions, CPI inflation, and jobs data</p>
+							<p class="section-subtitle">Real-time US market events: Fed interest rate decisions, CPI inflation, and jobs reports</p>
 						</div>
 					</header>
 
 					<div class="calendar-card">
 						<div class="tradingview-widget-container">
 							<div class="tradingview-widget-container__widget"></div>
-							<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async is:inline>
-							{
-								"colorTheme": "dark",
-								"isTransparent": false,
-								"width": "100%",
-								"height": "520",
-								"locale": "en",
-								"importanceFilter": "0,1",
-								"countryFilter": "us"
-							}
-							</script>
+							<script 
+								type="text/javascript" 
+								src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" 
+								async 
+								is:inline 
+								set:html={`{
+									"colorTheme": "dark",
+									"isTransparent": false,
+									"width": "100%",
+									"height": "520",
+									"locale": "en",
+									"importanceFilter": "0,1",
+									"countryFilter": "us"
+								}`}
+							/>
 						</div>
 					</div>
 				</section>
@@ -261,8 +269,9 @@ function formatDate(date: Date | null | undefined) {
 			</div>
 		)
 	}
-</Base>
-<script is:inline>
+
+	<!-- ⚡ CLIENT-SIDE INSTANT SECTOR FILTER SCRIPT -->
+	<script is:inline>
 		function initSectorFilters() {
 			const buttons = document.querySelectorAll(".filter-btn");
 			const cards = document.querySelectorAll(".post-card-container");
@@ -291,7 +300,8 @@ function formatDate(date: Date | null | undefined) {
 		} else {
 			initSectorFilters();
 		}
-</script>
+	</script>
+</Base>
 
 <style>
 	.home-content {
