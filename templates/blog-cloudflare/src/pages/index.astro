@@ -10,7 +10,6 @@ import PostCard from "../components/PostCard.astro";
 import { getReadingTime } from "../utils/reading-time";
 import { resolveBlogSiteIdentity } from "../utils/site-identity";
 
-// Increased limit so editorial desks display ample market research
 const POSTS_PER_PAGE = 12;
 
 const [{ entries: posts, cacheHint }, settings] = await Promise.all([
@@ -27,11 +26,9 @@ if (Astro.cache?.enabled) Astro.cache.set(cacheHint);
 const visiblePosts = posts.slice(0, POSTS_PER_PAGE);
 const hasMorePosts = posts.length > POSTS_PER_PAGE;
 
-// Find the first post with a featured image for the hero
 const featuredPost = visiblePosts.find((p) => p.data.featured_image);
 const featuredIndex = featuredPost ? visiblePosts.indexOf(featuredPost) : -1;
 
-// Remaining posts for the sector desks
 const gridPosts = visiblePosts.filter((_, i) => i !== featuredIndex);
 
 const entryIds = [
@@ -39,7 +36,6 @@ const entryIds = [
 	...gridPosts.map((p) => p.data.id),
 ];
 
-// Single batched query for both tags AND categories
 const [tagsByEntry, categoriesByEntry] = await Promise.all([
 	getTermsForEntries("posts", entryIds, "tag"),
 	getTermsForEntries("posts", entryIds, "category"),
@@ -72,7 +68,6 @@ const gridPostsWithMeta = gridPosts.map((post) => ({
 	bylines: post.data.bylines ?? [],
 }));
 
-// Collect unique categories present on posts for dynamic filter pills
 const availableCategories = Array.from(
 	new Map(
 		gridPostsWithMeta
@@ -103,7 +98,7 @@ function formatDate(date: Date | null | undefined) {
 			</section>
 		) : (
 			<div class="home-content">
-				{/* 1. FEATURED HERO POST - Title on TOP, Full-width Chart BELOW */}
+				{/* 1. FEATURED HERO POST */}
 				{featuredPost && (
 					<section class="featured-section">
 						<div class="featured-hero-container">
@@ -160,36 +155,13 @@ function formatDate(date: Date | null | undefined) {
 					<header class="section-header">
 						<div>
 							<h2 class="section-title">Market Pulse: S&P 500 Heatmap</h2>
-							<p class="section-subtitle">Real-time equities performance by sector and market capitalization</p>
+							<p class="section-subtitle">Live performance by sector and market capitalization</p>
 						</div>
 					</header>
 
 					<div class="heatmap-card">
-						<div class="tradingview-widget-container">
+						<div class="tradingview-widget-container" id="tv-heatmap-box">
 							<div class="tradingview-widget-container__widget"></div>
-							<script 
-								type="text/javascript" 
-								src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" 
-								async 
-								is:inline 
-								set:html={`{
-									"exchanges": [],
-									"dataSource": "SPX500",
-									"grouping": "sector",
-									"blockSize": "market_cap_calc",
-									"blockColor": "change",
-									"locale": "en",
-									"symbolUrl": "",
-									"colorTheme": "dark",
-									"hasTopBar": false,
-									"isDataSetEnabled": false,
-									"isZoomEnabled": true,
-									"hasSymbolTooltip": true,
-									"isMonoSize": false,
-									"width": "100%",
-									"height": "520"
-								}`}
-							/>
 						</div>
 					</div>
 				</section>
@@ -199,28 +171,13 @@ function formatDate(date: Date | null | undefined) {
 					<header class="section-header">
 						<div>
 							<h2 class="section-title">Macro Catalysts: Economic Calendar</h2>
-							<p class="section-subtitle">Real-time US market events: Fed interest rate decisions, CPI inflation, and jobs reports</p>
+							<p class="section-subtitle">Real-time US market events: FOMC, CPI inflation, and jobs reports</p>
 						</div>
 					</header>
 
 					<div class="calendar-card">
-						<div class="tradingview-widget-container">
+						<div class="tradingview-widget-container" id="tv-calendar-box">
 							<div class="tradingview-widget-container__widget"></div>
-							<script 
-								type="text/javascript" 
-								src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" 
-								async 
-								is:inline 
-								set:html={`{
-									"colorTheme": "dark",
-									"isTransparent": false,
-									"width": "100%",
-									"height": "520",
-									"locale": "en",
-									"importanceFilter": "0,1",
-									"countryFilter": "us"
-								}`}
-							/>
 						</div>
 					</div>
 				</section>
@@ -234,7 +191,6 @@ function formatDate(date: Date | null | undefined) {
 								<p class="section-subtitle">In-depth technical analysis, macro policy, and trade execution</p>
 							</div>
 
-							<!-- Interactive Filter Bar -->
 							<div class="sector-filter-bar">
 								<button class="filter-btn active" data-filter="all">All Coverage</button>
 								{availableCategories.map((cat) => (
@@ -271,17 +227,62 @@ function formatDate(date: Date | null | undefined) {
 	}
 
 <script is:inline>
-		function initSectorFilters() {
+		function loadTradingWidgets() {
+			// 1. Heatmap Widget
+			const hmBox = document.getElementById("tv-heatmap-box");
+			if (hmBox && !hmBox.querySelector("script")) {
+				const s1 = document.createElement("script");
+				s1.type = "text/javascript";
+				s1.src = "https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js";
+				s1.async = true;
+				s1.text = JSON.stringify({
+					"exchanges": [],
+					"dataSource": "SPX500",
+					"grouping": "sector",
+					"blockSize": "market_cap_calc",
+					"blockColor": "change",
+					"locale": "en",
+					"symbolUrl": "",
+					"colorTheme": "dark",
+					"hasTopBar": false,
+					"isDataSetEnabled": false,
+					"isZoomEnabled": true,
+					"hasSymbolTooltip": true,
+					"isMonoSize": false,
+					"width": "100%",
+					"height": "520"
+				});
+				hmBox.appendChild(s1);
+			}
+
+			// 2. Calendar Widget
+			const calBox = document.getElementById("tv-calendar-box");
+			if (calBox && !calBox.querySelector("script")) {
+				const s2 = document.createElement("script");
+				s2.type = "text/javascript";
+				s2.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+				s2.async = true;
+				s2.text = JSON.stringify({
+					"colorTheme": "dark",
+					"isTransparent": false,
+					"width": "100%",
+					"height": "520",
+					"locale": "en",
+					"importanceFilter": "0,1",
+					"countryFilter": "us"
+				});
+				calBox.appendChild(s2);
+			}
+
+			// 3. Sector Desks Filter
 			const buttons = document.querySelectorAll(".filter-btn");
 			const cards = document.querySelectorAll(".post-card-container");
-
 			buttons.forEach((btn) => {
 				btn.addEventListener("click", () => {
 					buttons.forEach((b) => b.classList.remove("active"));
 					btn.classList.add("active");
 
 					const filter = btn.getAttribute("data-filter");
-
 					cards.forEach((card) => {
 						const cardCategories = card.getAttribute("data-categories") || "";
 						if (filter === "all" || cardCategories.split(",").includes(filter)) {
@@ -295,9 +296,9 @@ function formatDate(date: Date | null | undefined) {
 		}
 
 		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", initSectorFilters);
+			document.addEventListener("DOMContentLoaded", loadTradingWidgets);
 		} else {
-			initSectorFilters();
+			loadTradingWidgets();
 		}
 	</script>
 </Base>
@@ -309,7 +310,6 @@ function formatDate(date: Date | null | undefined) {
 		padding: var(--spacing-8) var(--spacing-6) var(--spacing-16);
 	}
 
-	/* Hero Section */
 	.featured-section {
 		margin-bottom: var(--spacing-16);
 		padding-bottom: var(--spacing-12);
@@ -435,7 +435,6 @@ function formatDate(date: Date | null | undefined) {
 		transform: scale(1.015);
 	}
 
-	/* Section Headers */
 	.section-header {
 		margin-bottom: var(--spacing-6);
 	}
@@ -454,7 +453,6 @@ function formatDate(date: Date | null | undefined) {
 		margin-top: 3px;
 	}
 
-	/* Heatmap & Calendar Cards */
 	.heatmap-section,
 	.calendar-section {
 		margin-bottom: var(--spacing-16);
@@ -474,7 +472,6 @@ function formatDate(date: Date | null | undefined) {
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 	}
 
-	/* Editorial Desks Layout */
 	.editorial-desks-section {
 		margin-top: var(--spacing-10);
 	}
@@ -490,7 +487,6 @@ function formatDate(date: Date | null | undefined) {
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 
-	/* Sector Filter Pills */
 	.sector-filter-bar {
 		display: flex;
 		gap: 0.5rem;
@@ -524,7 +520,6 @@ function formatDate(date: Date | null | undefined) {
 		box-shadow: 0 0 12px rgba(2, 132, 199, 0.35);
 	}
 
-	/* Posts Grid */
 	.posts-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
@@ -536,7 +531,6 @@ function formatDate(date: Date | null | undefined) {
 		transition: opacity 0.3s ease;
 	}
 
-	/* Empty State */
 	.empty-state {
 		display: flex;
 		flex-direction: column;
@@ -564,7 +558,6 @@ function formatDate(date: Date | null | undefined) {
 		font-weight: 600;
 	}
 
-	/* Responsive */
 	@media (max-width: 900px) {
 		.heatmap-card,
 		.calendar-card {
