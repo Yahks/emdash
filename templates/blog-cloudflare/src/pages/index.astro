@@ -98,7 +98,7 @@ function formatDate(date: Date | null | undefined) {
 			</section>
 		) : (
 			<div class="home-content">
-				{/* 1. FEATURED HERO POST */}
+				{/* 1. FEATURED HERO POST - Title on TOP, Full-width Chart BELOW */}
 				{featuredPost && (
 					<section class="featured-section">
 						<div class="featured-hero-container">
@@ -155,7 +155,7 @@ function formatDate(date: Date | null | undefined) {
 					<header class="section-header">
 						<div>
 							<h2 class="section-title">Market Pulse: S&P 500 Heatmap</h2>
-							<p class="section-subtitle">Live performance by sector and market capitalization</p>
+							<p class="section-subtitle">Real-time equities performance by sector and market capitalization</p>
 						</div>
 					</header>
 
@@ -166,18 +166,39 @@ function formatDate(date: Date | null | undefined) {
 					</div>
 				</section>
 
-				{/* 3. LIVE MACRO & ECONOMIC CALENDAR */}
-				<section class="calendar-section">
-					<header class="section-header">
-						<div>
-							<h2 class="section-title">Macro Catalysts: Economic Calendar</h2>
-							<p class="section-subtitle">Real-time US market events: FOMC, CPI inflation, and jobs reports</p>
-						</div>
-					</header>
+				{/* 3. DUAL-DESK MARKET RADAR (LIVE NEWS WIRE + ECONOMIC CALENDAR) */}
+				<section class="market-radar-section">
+					<div class="radar-grid">
+						{/* Left Column: Live Breaking Market News Wire */}
+						<div class="radar-column">
+							<header class="section-header">
+								<div>
+									<h2 class="section-title">🔴 Live Market Wire: Breaking News</h2>
+									<p class="section-subtitle">24/7 streaming financial headlines & earnings alerts</p>
+								</div>
+							</header>
 
-					<div class="calendar-card">
-						<div class="tradingview-widget-container" id="tv-calendar-box">
-							<div class="tradingview-widget-container__widget"></div>
+							<div class="radar-card">
+								<div class="tradingview-widget-container" id="tv-news-box">
+									<div class="tradingview-widget-container__widget"></div>
+								</div>
+							</div>
+						</div>
+
+						{/* Right Column: Macro Catalysts & Economic Calendar */}
+						<div class="radar-column">
+							<header class="section-header">
+								<div>
+									<h2 class="section-title">📅 Macro Catalysts: Economic Calendar</h2>
+									<p class="section-subtitle">US economic events: Fed interest rate decisions, CPI & Jobs</p>
+								</div>
+							</header>
+
+							<div class="radar-card">
+								<div class="tradingview-widget-container" id="tv-calendar-box">
+									<div class="tradingview-widget-container__widget"></div>
+								</div>
+							</div>
 						</div>
 					</div>
 				</section>
@@ -226,7 +247,8 @@ function formatDate(date: Date | null | undefined) {
 		)
 	}
 
-<script is:inline>
+	<!-- ⚡ SAFE TRADINGVIEW & FILTER LOADER -->
+	<script is:inline>
 		function loadTradingWidgets() {
 			// 1. Heatmap Widget
 			const hmBox = document.getElementById("tv-heatmap-box");
@@ -255,14 +277,33 @@ function formatDate(date: Date | null | undefined) {
 				hmBox.appendChild(s1);
 			}
 
-			// 2. Calendar Widget
-			const calBox = document.getElementById("tv-calendar-box");
-			if (calBox && !calBox.querySelector("script")) {
+			// 2. Breaking News Timeline Widget
+			const newsBox = document.getElementById("tv-news-box");
+			if (newsBox && !newsBox.querySelector("script")) {
 				const s2 = document.createElement("script");
 				s2.type = "text/javascript";
-				s2.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+				s2.src = "https://s3.tradingview.com/external-embedding/embed-widget-timeline.js";
 				s2.async = true;
 				s2.text = JSON.stringify({
+					"feedMode": "all_symbols",
+					"isTransparent": false,
+					"displayMode": "regular",
+					"width": "100%",
+					"height": "520",
+					"colorTheme": "dark",
+					"locale": "en"
+				});
+				newsBox.appendChild(s2);
+			}
+
+			// 3. Economic Calendar Widget
+			const calBox = document.getElementById("tv-calendar-box");
+			if (calBox && !calBox.querySelector("script")) {
+				const s3 = document.createElement("script");
+				s3.type = "text/javascript";
+				s3.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+				s3.async = true;
+				s3.text = JSON.stringify({
 					"colorTheme": "dark",
 					"isTransparent": false,
 					"width": "100%",
@@ -271,10 +312,10 @@ function formatDate(date: Date | null | undefined) {
 					"importanceFilter": "0,1",
 					"countryFilter": "us"
 				});
-				calBox.appendChild(s2);
+				calBox.appendChild(s3);
 			}
 
-			// 3. Sector Desks Filter
+			// 4. Sector Desks Filter
 			const buttons = document.querySelectorAll(".filter-btn");
 			const cards = document.querySelectorAll(".post-card-container");
 			buttons.forEach((btn) => {
@@ -436,7 +477,7 @@ function formatDate(date: Date | null | undefined) {
 	}
 
 	.section-header {
-		margin-bottom: var(--spacing-6);
+		margin-bottom: var(--spacing-4);
 	}
 
 	.section-title {
@@ -453,16 +494,15 @@ function formatDate(date: Date | null | undefined) {
 		margin-top: 3px;
 	}
 
-	.heatmap-section,
-	.calendar-section {
+	/* 📊 Heatmap */
+	.heatmap-section {
 		margin-bottom: var(--spacing-16);
 		padding-bottom: var(--spacing-12);
 		border-bottom: 1px solid var(--color-border-subtle);
 		width: 100%;
 	}
 
-	.heatmap-card,
-	.calendar-card {
+	.heatmap-card {
 		width: 100%;
 		height: 520px;
 		border-radius: var(--radius-lg);
@@ -472,6 +512,36 @@ function formatDate(date: Date | null | undefined) {
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 	}
 
+	/* ⚡ Dual-Desk Market Radar */
+	.market-radar-section {
+		margin-bottom: var(--spacing-16);
+		padding-bottom: var(--spacing-12);
+		border-bottom: 1px solid var(--color-border-subtle);
+		width: 100%;
+	}
+
+	.radar-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--spacing-8);
+		width: 100%;
+	}
+
+	.radar-column {
+		width: 100%;
+	}
+
+	.radar-card {
+		width: 100%;
+		height: 520px;
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		border: 1px solid var(--color-border-subtle);
+		background: #0f172a;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+	}
+
+	/* Sector Desks Layout */
 	.editorial-desks-section {
 		margin-top: var(--spacing-10);
 	}
@@ -558,10 +628,11 @@ function formatDate(date: Date | null | undefined) {
 		font-weight: 600;
 	}
 
-	@media (max-width: 900px) {
-		.heatmap-card,
-		.calendar-card {
-			height: 440px;
+	/* Responsive */
+	@media (max-width: 1024px) {
+		.radar-grid {
+			grid-template-columns: 1fr;
+			gap: var(--spacing-10);
 		}
 
 		.posts-grid {
@@ -576,6 +647,10 @@ function formatDate(date: Date | null | undefined) {
 
 		.featured-title {
 			font-size: 2rem;
+		}
+
+		.radar-card {
+			height: 440px;
 		}
 
 		.desks-header {
